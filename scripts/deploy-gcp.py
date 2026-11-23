@@ -40,6 +40,8 @@ def run(exe, args, *, data=None, env=None, cwd=ROOT):
         diagnostic.parent.mkdir(mode=0o700, exist_ok=True)
         diagnostic.write_text(result.stderr)
         diagnostic.chmod(0o600)
+        if 'disabled in state delinquent' in result.stderr.lower():
+            raise RuntimeError('Google Cloud rejected resource creation: the linked billing account is disabled in state delinquent. Resolve the billing-account restriction in Cloud Billing, then retry this deployment. No later deployment steps ran.')
         raise RuntimeError(f'{Path(exe).name} operation failed: {args[0]}. Private diagnostics: .deploy/last-error.log')
     return result.stdout.strip()
 
@@ -58,9 +60,12 @@ def preflight():
     b = json.loads(gc('billing', 'projects', 'describe', PROJECT, '--format=json'))
     if not b.get('billingEnabled'):
         raise RuntimeError('This project needs Firebase Blaze / linked Cloud Billing before deployment.')
+    account = json.loads(gc('billing', 'accounts', 'describe', b['billingAccountName'].split('/')[-1], '--format=json'))
+    if not account.get('open'):
+        raise RuntimeError('The billing account linked to incys-institute is closed (open: false). Reopen it or link an active account before deployment. No resources were provisioned by this run.')
     # Terraform uses ADC rather than the gcloud CLI login. Never print its token.
     run(GCLOUD, ['auth', 'application-default', 'print-access-token'])
-    print(f'Access and billing verified for {PROJECT}.')
+    print(f'Access and a billing-account link verified for {PROJECT}. Resource APIs must also accept the billing account.')
 
 
 def ensure_secret(name, username):

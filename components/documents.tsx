@@ -1,6 +1,53 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import { authHeaders } from "@/lib/client";
+export function DocumentDownload({
+  id,
+  filename,
+}: {
+  id: string;
+  filename: string;
+}) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  async function download() {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fetch(`/api/v1/documents/${id}`, {
+        headers: await authHeaders(),
+      });
+      if (!r.ok) throw new Error((await r.json()).error);
+      const url = URL.createObjectURL(await r.blob()),
+        a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <button
+        type="button"
+        className="button tiny secondary"
+        disabled={busy}
+        onClick={download}
+      >
+        {busy ? "Downloading…" : `Download ${filename}`}
+      </button>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
 export function Documents({
   documents,
   refresh,
@@ -29,23 +76,6 @@ export function Documents({
       setError((e as Error).message);
     } finally {
       setBusy(false);
-    }
-  }
-  async function download(d: any) {
-    setError("");
-    try {
-      const r = await fetch(`/api/v1/documents/${d.id}`, {
-        headers: await authHeaders(),
-      });
-      if (!r.ok) throw new Error((await r.json()).error);
-      const url = URL.createObjectURL(await r.blob()),
-        a = document.createElement("a");
-      a.href = url;
-      a.download = d.filename;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (e) {
-      setError((e as Error).message);
     }
   }
   return (
@@ -105,12 +135,7 @@ export function Documents({
                 <td>{d.purpose.replaceAll("_", " ")}</td>
                 <td>{Math.ceil(d.size_bytes / 1024)} KB</td>
                 <td>
-                  <button
-                    className="button tiny secondary"
-                    onClick={() => download(d)}
-                  >
-                    Download
-                  </button>
+                  <DocumentDownload id={d.id} filename={d.filename} />
                 </td>
               </tr>
             ))}

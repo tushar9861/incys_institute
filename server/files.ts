@@ -92,25 +92,38 @@ export async function uploadDocument(request: Request) {
     await mkdir(path.dirname(dest), { recursive: true });
     await writeFile(dest, bytes, { flag: "wx" });
   }
-  return transaction(async (db) => {
-    const record = await one(
-      "INSERT INTO documents(owner_id,filename,mime_type,size_bytes,storage_key,purpose,state) VALUES($1,$2,$3,$4,$5,$6,'clean') RETURNING id,filename,mime_type,size_bytes,purpose,state,created_at",
-      [
-        user.id,
-        path
-          .basename(file.name)
-          .replace(/[\r\n"\\]/g, "")
-          .slice(0, 180),
-        file.type,
-        file.size,
-        key,
-        purpose,
-      ],
-      db,
-    );
-    await audit(db, user.id, "document.uploaded", record!.id, { purpose });
-    return record;
-  });
+  try {
+    return await transaction(async (db) => {
+      const record = await one(
+        "INSERT INTO documents(owner_id,filename,mime_type,size_bytes,storage_key,purpose,state) VALUES($1,$2,$3,$4,$5,$6,'clean') RETURNING id,filename,mime_type,size_bytes,purpose,state,created_at",
+        [
+          user.id,
+          path
+            .basename(file.name)
+            .replace(/[\r\n"\\]/g, "")
+            .slice(0, 180),
+          file.type,
+          file.size,
+          key,
+          purpose,
+        ],
+        db,
+      );
+      await audit(db, user.id, "document.uploaded", record!.id, { purpose });
+      return record;
+    });
+  } catch (error) {
+    // Do not leave an untracked private object after a failed database write.
+    try {
+      if (process.env.GCS_PRIVATE_BUCKET) await storage().file(key).delete();
+      else await unlink(path.join(process.cwd(), "uploads", key));
+    } catch {
+      console.error(
+        "Private document cleanup failed; storage reconciliation is required.",
+      );
+    }
+    throw error;
+  }
 }
 export async function downloadDocument(request: Request, id: string) {
   const user = await authenticate(request),
@@ -126,6 +139,13 @@ export async function downloadDocument(request: Request, id: string) {
       await one(
         "SELECT id FROM appointments WHERE patient_id=$1 AND practitioner_id=$2 AND status IN ('confirmed','completed') LIMIT 1",
         [doc.owner_id, user.id],
+      ),
+    );
+  if (!permitted && doc.purpose === "assignment_attachment")
+    permitted = Boolean(
+      await one(
+        "SELECT s.id FROM submissions s JOIN assignments a ON a.id=s.assignment_id JOIN cohorts h ON h.id=a.cohort_id WHERE s.document_id=$1 AND ($2 OR ($3 AND h.trainer_id=$4)) LIMIT 1",
+        [doc.id, has(user, "admin"), has(user, "trainer"), user.id],
       ),
     );
   requireThat(permitted, 403, "You cannot access this document.");

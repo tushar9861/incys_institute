@@ -98,7 +98,7 @@ export async function learningDetail(user: User, id: string) {
     [e.cohort_id, e.student_id],
   );
   const assignments = await rows(
-    "SELECT a.*,s.id AS submission_id,s.body AS submission_body,s.score,s.feedback FROM assignments a LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=$2 WHERE cohort_id=$1 ORDER BY due_at",
+    "SELECT a.*,s.id AS submission_id,s.body AS submission_body,s.document_id,d.filename AS document_filename,s.score,s.feedback FROM assignments a LEFT JOIN submissions s ON s.assignment_id=a.id AND s.student_id=$2 LEFT JOIN documents d ON d.id=s.document_id WHERE cohort_id=$1 ORDER BY due_at",
     [e.cohort_id, e.student_id],
   );
   const certificate = await one(
@@ -171,7 +171,10 @@ export async function completeLesson(
 }
 export async function submitAssignment(user: User, id: string, input: unknown) {
   const d = z
-    .object({ body: z.string().trim().min(5).max(30000) })
+    .object({
+      body: z.string().trim().min(5).max(30000),
+      documentId: uuid.nullable().optional(),
+    })
     .parse(input);
   return transaction(async (db) => {
     const a = await one(
@@ -195,11 +198,27 @@ export async function submitAssignment(user: User, id: string, input: unknown) {
       409,
       "A graded submission cannot be replaced.",
     );
+    const documentId =
+      d.documentId === undefined
+        ? (existing?.document_id ?? null)
+        : d.documentId;
+    if (documentId) {
+      requireThat(
+        await one(
+          "SELECT id FROM documents WHERE id=$1 AND owner_id=$2 AND purpose='assignment_attachment' AND state='clean' FOR SHARE",
+          [documentId, user.id],
+          db,
+        ),
+        403,
+        "Select one of your scanned assignment attachments.",
+      );
+    }
     const result = await one(
-      `INSERT INTO submissions(assignment_id,student_id,body) VALUES($1,$2,$3) ON CONFLICT(assignment_id,student_id) DO UPDATE SET body=excluded.body,submitted_at=now() RETURNING *`,
-      [id, user.id, d.body],
+      `INSERT INTO submissions(assignment_id,student_id,body,document_id) VALUES($1,$2,$3,$4) ON CONFLICT(assignment_id,student_id) DO UPDATE SET body=excluded.body,document_id=excluded.document_id,submitted_at=now() WHERE submissions.score IS NULL RETURNING *`,
+      [id, user.id, d.body, documentId],
       db,
     );
+    requireThat(result, 409, "A graded submission cannot be replaced.");
     await audit(db, user.id, "assignment.submitted", result!.id);
     return result;
   });

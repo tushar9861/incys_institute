@@ -1,6 +1,6 @@
 # INCYS Firebase and GCP deployment
 
-The user enabled Blaze on 23 November 2026 and authorized the full platform architecture. Project access and linked Cloud Billing were verified. Publication and live acceptance must still be established by deployment results; a prepared configuration is not a live service.
+The user enabled Blaze on 23 November 2026 and authorized the full platform architecture. Deployment authentication succeeded, required APIs were enabled and the Android app was registered. Provisioning is currently blocked by the linked billing account: Storage reports “disabled in state delinquent” and the Billing API reports `open: false` for “Firebase Payment.” Project-level `billingEnabled: true` only confirms the link. No backend/database or Hosting release is live. Reopen the linked account or link an active one before retrying.
 
 ## Architecture
 
@@ -30,7 +30,7 @@ npm run cloud:preflight
 npm run cloud:deploy
 ```
 
-Firebase CLI supports ADC; a separate Firebase login can also be used. `GCLOUD_BIN`, `TERRAFORM_BIN` and `FIREBASE_BIN` can select installed executable paths. The preflight verifies account access, project number `688961840489`, billing and ADC without provisioning anything. Never commit service-account keys, database credentials, OAuth tokens or provider secrets.
+Firebase CLI supports ADC; a separate Firebase login can also be used. `GCLOUD_BIN`, `TERRAFORM_BIN` and `FIREBASE_BIN` can select installed executable paths. The preflight verifies account access, project number `688961840489`, the billing link, an open linked billing account and ADC without provisioning anything. Never commit service-account keys, database credentials, OAuth tokens or provider secrets.
 
 The deploy command creates regional database secrets without printing values, provisions the foundation, builds versioned application/scanner images, configures identity, applies the stack and executes migration and worker jobs. Existing authorized domains and unrelated identity settings are retained. Plans with deletions/replacements are refused. Hosting is published only after backend database readiness. Public live checks run before the scheduler resumes.
 
@@ -51,6 +51,6 @@ Bootstrap refuses once an active administrator exists. Enroll TOTP at sign-in be
 
 The app calls the private scanner using a Google-signed identity token. The scanner returns a clean verdict only after the engine accepts the file and its loaded signatures are no older than 72 hours. Failed, incomplete or stale scans reject the upload. The scanner needs update connectivity and monitoring; local container tests do not establish deployed IAM or network behavior.
 
-Configure Razorpay test credentials through `runtime_secrets` and verify signed webhooks, refunds and duplicate events before using live payments. Register the Android app separately and fetch its SDK configuration using the Firebase CLI; the supplied app ID is for the web application. Client-owned Android release signing is a separate requirement.
+Configure Razorpay test credentials through `runtime_secrets` and verify signed webhooks, refunds and duplicate events before using live payments. The Android app `institute.incys.incys_mobile` is registered as `1:688961840489:android:5208b298c3a6a2f35289f8`. Its public SDK configuration is in `config/firebase.android.json`, `mobile/android/app/google-services.json` and `mobile/config/live.json`. Build with `flutter build apk --debug --dart-define-from-file=config/live.json`; this points to the intended HTTPS Hosting endpoint, which must be deployed before the app can work. Client-owned Android release signing is a separate requirement.
 
 Complete the live acceptance flows in [delivery status](delivery-status.md), including account isolation, bookings, LMS, payments, uploads, notifications, mobile access and backup restoration. See [operations](deployment.md) and [validation](validation.md) for current limits and observed test results.

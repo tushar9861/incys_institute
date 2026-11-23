@@ -33,7 +33,7 @@ import {
   joinAppointment,
   appointments,
 } from "../server/clinic";
-import { updateResource, createResource } from "../server/platform";
+import { updateResource, createResource, workspace } from "../server/platform";
 import { uploadDocument, downloadDocument } from "../server/files";
 after(async () => pool.end());
 async function user(role = "patient"): Promise<User> {
@@ -299,14 +299,101 @@ test("course completion requires approved enrolment, the right lessons, fees and
     /course version/,
   );
   await completeLesson(student, e.id, { lessonId: l.id });
+  const upload = async (owner: User, purpose: string) => {
+    const session = await login(owner.email, "test-password-for-suite");
+    const form = new FormData();
+    form.set(
+      "file",
+      new File(["%PDF-1.4\nSynthetic assignment"], "assignment.pdf", {
+        type: "application/pdf",
+      }),
+    );
+    form.set("purpose", purpose);
+    return (await uploadDocument(
+      new Request("http://localhost/api/v1/documents", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.token}` },
+        body: form,
+      }),
+    ))!;
+  };
+  const attachment = await upload(student, "assignment_attachment");
+  const otherAttachment = await upload(otherTeacher, "assignment_attachment");
+  const clinical = await upload(student, "patient_report");
+  const quarantined = await upload(student, "assignment_attachment");
+  await pool.query("UPDATE documents SET state='quarantined' WHERE id=$1", [
+    quarantined.id,
+  ]);
+  for (const forbidden of [otherAttachment, clinical, quarantined]) {
+    await assert.rejects(
+      () =>
+        submitAssignment(student, a.id, {
+          body: "Cannot attach another owner's, clinical, or unscanned document.",
+          documentId: forbidden.id,
+        }),
+      /scanned assignment attachments/,
+    );
+  }
+  const downloadAs = async (viewer: User, id: string) => {
+    const session = await login(viewer.email, "test-password-for-suite");
+    return downloadDocument(
+      new Request("http://localhost", {
+        headers: { Authorization: `Bearer ${session.token}` },
+      }),
+      id,
+    );
+  };
+  await assert.rejects(
+    () => downloadAs(teacher, attachment.id),
+    /cannot access/,
+  );
   const s = (await submitAssignment(student, a.id, {
     body: "Synthetic assignment response.",
+    documentId: attachment.id,
   }))!;
+  assert.equal(s.document_id, attachment.id);
+  assert.equal((await downloadAs(teacher, attachment.id)).status, 200);
+  assert.equal((await downloadAs(admin, attachment.id)).status, 200);
+  await assert.rejects(
+    () => downloadAs(otherTeacher, attachment.id),
+    /cannot access/,
+  );
+  await assert.rejects(() => downloadAs(admin, clinical.id), /cannot access/);
+  assert.ok(
+    (await workspace(teacher)).documents.some(
+      (d: any) => d.id === attachment.id,
+    ),
+  );
+  assert.ok(
+    !(await workspace(otherTeacher)).documents.some(
+      (d: any) => d.id === attachment.id,
+    ),
+  );
+  await submitAssignment(student, a.id, {
+    body: "Removed the attachment.",
+    documentId: null,
+  });
+  await assert.rejects(
+    () => downloadAs(teacher, attachment.id),
+    /cannot access/,
+  );
+  await submitAssignment(student, a.id, {
+    body: "Reattached the assignment.",
+    documentId: attachment.id,
+  });
   await assert.rejects(
     () => gradeSubmission(otherTeacher, s.id, { score: 90, feedback: "Test" }),
     /not assigned/,
   );
   await gradeSubmission(teacher, s.id, { score: 90, feedback: "Pass" });
+  await assert.rejects(
+    () =>
+      submitAssignment(student, a.id, {
+        body: "Attempt to replace graded work.",
+        documentId: null,
+      }),
+    /graded submission/,
+  );
   const certificate = await issueCertificate(admin, e.id);
   assert.ok(certificate!.serial.startsWith("INCYS-"));
   await assert.rejects(() => issueCertificate(admin, e.id), /active enrolment/);

@@ -28,7 +28,7 @@ Production clients send `Authorization: Bearer FIREBASE_ID_TOKEN`. Local develop
 | `POST /enrolments`                                            | Apply for a published cohort with consent                        |
 | `GET`, `PATCH /enrolments/:id`                                | Learning details / admin admission decision                      |
 | `POST /enrolments/:id/lessons`, `/enrolments/:id/certificate` | Student progress / admin certificate issuance                    |
-| `POST /assignments/:id/submit`                                | Active learner's text submission                                 |
+| `POST /assignments/:id/submit`                                | Active learner's response and optional private attachment                                 |
 | `PATCH /submissions/:id`                                      | Assigned trainer/admin grade and feedback                        |
 | `POST /classes/:id/attendance`, `/classes/:id/join`           | Record attendance / gated meeting URL                            |
 | `POST /quizzes`, `/quizzes/:id/start`, `/quiz-attempts/:id`   | Author assessment, start/resume own attempt, submit answers      |
@@ -75,3 +75,5 @@ Example checkout body:
 ```
 
 Use a new idempotency key for a new purchase, and reuse it when retrying the same checkout request. Do not reuse a key for a changed cart. To use live integrations, complete the deployment runbook and provider test-mode acceptance first.
+
+Assignment submissions accept `{ "body": "...", "documentId": "UUID or null" }`. The document must belong to the learner, be clean and have purpose `assignment_attachment`. Omitting `documentId` preserves an existing attachment; `null` removes it. Only the owner, the assigned cohort trainer or an academic administrator can download a linked assignment attachment. Unlinked academic uploads remain owner-only. Graded submissions cannot be replaced.

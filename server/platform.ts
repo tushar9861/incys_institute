@@ -56,13 +56,14 @@ export async function workspace(user: User) {
     ],
   );
   data.documents = await rows(
-    `SELECT d.id,d.filename,d.mime_type,d.size_bytes,d.purpose,d.state,d.created_at,u.name AS owner_name
+    `SELECT d.id,d.owner_id,d.filename,d.mime_type,d.size_bytes,d.purpose,d.state,d.created_at,u.name AS owner_name
     FROM documents d JOIN users u ON u.id=d.owner_id
     WHERE d.state='clean' AND (d.owner_id=$1
       OR ($2 AND d.purpose='admission_document')
-      OR ($3 AND d.purpose='patient_report' AND EXISTS(SELECT 1 FROM appointments a WHERE a.patient_id=d.owner_id AND a.practitioner_id=$1 AND a.status IN ('confirmed','completed'))))
+      OR ($3 AND d.purpose='patient_report' AND EXISTS(SELECT 1 FROM appointments a WHERE a.patient_id=d.owner_id AND a.practitioner_id=$1 AND a.status IN ('confirmed','completed')))
+      OR (d.purpose='assignment_attachment' AND EXISTS(SELECT 1 FROM submissions s JOIN assignments a ON a.id=s.assignment_id JOIN cohorts h ON h.id=a.cohort_id WHERE s.document_id=d.id AND ($2 OR ($4 AND h.trainer_id=$1)))))
     ORDER BY d.created_at DESC LIMIT 200`,
-    [user.id, has(user, "admin"), has(user, "clinician")],
+    [user.id, has(user, "admin"), has(user, "clinician"), has(user, "trainer")],
   );
   const [a, e, o, n, t] = await Promise.all([
     appointments(user),
@@ -123,7 +124,7 @@ export async function workspace(user: User) {
       [ids],
     );
     data.submissions = await rows(
-      "SELECT s.*,a.title AS assignment_title,a.max_score,u.name AS student_name FROM submissions s JOIN assignments a ON a.id=s.assignment_id JOIN users u ON u.id=s.student_id WHERE a.cohort_id=ANY($1::uuid[]) ORDER BY s.submitted_at DESC",
+      "SELECT s.*,d.filename AS document_filename,a.title AS assignment_title,a.max_score,u.name AS student_name FROM submissions s JOIN assignments a ON a.id=s.assignment_id JOIN users u ON u.id=s.student_id LEFT JOIN documents d ON d.id=s.document_id WHERE a.cohort_id=ANY($1::uuid[]) ORDER BY s.submitted_at DESC",
       [ids],
     );
     data.versions = await rows(

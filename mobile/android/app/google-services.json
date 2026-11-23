@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "688961840489",
+    "project_id": "incys-institute",
+    "storage_bucket": "incys-institute.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:688961840489:android:5208b298c3a6a2f35289f8",
+        "android_client_info": {
+          "package_name": "institute.incys.incys_mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "688961840489-57d6gonl0o2ta6o7i5i764ejd5doeb8a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCviSwFLWDNCqnuwD9ud-6o6VtdlqTidp0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "688961840489-57d6gonl0o2ta6o7i5i764ejd5doeb8a.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

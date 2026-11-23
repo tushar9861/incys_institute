@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { api, money, date, logout, preferredRole } from "@/lib/client";
 import { QuizComposer } from "./quiz-composer";
-import { Documents } from "./documents";
+import { Documents, DocumentDownload } from "./documents";
 type Field = {
   name: string;
   label: string;
@@ -1313,6 +1313,12 @@ export function Portal({ role }: { role: string }) {
                     <div>
                       <strong>{a.title}</strong>
                       <small>{a.instructions}</small>
+                      {a.document_id && (
+                        <DocumentDownload
+                          id={a.document_id}
+                          filename={a.document_filename}
+                        />
+                      )}
                     </div>,
                     date(a.due_at),
                     a.score == null ? (
@@ -1341,13 +1347,45 @@ export function Portal({ role }: { role: string }) {
                                 type: "textarea",
                                 value: a.submission_body,
                               },
+                              {
+                                name: "documentId",
+                                label:
+                                  "Attachment (upload in Support → Authorized documents first)",
+                                type: "select",
+                                value: a.document_id || "none",
+                                options: [
+                                  { value: "none", label: "No attachment" },
+                                  ...(a.document_id &&
+                                  !(data.documents || []).some(
+                                    (d: any) => d.id === a.document_id,
+                                  )
+                                    ? [
+                                        {
+                                          value: a.document_id,
+                                          label: a.document_filename,
+                                        },
+                                      ]
+                                    : []),
+                                  ...(data.documents || [])
+                                    .filter(
+                                      (d: any) =>
+                                        d.owner_id === data.user.id &&
+                                        d.purpose === "assignment_attachment" &&
+                                        d.state === "clean",
+                                    )
+                                    .map((d: any) => ({
+                                      value: d.id,
+                                      label: d.filename,
+                                    })),
+                                ],
+                              },
                             ],
                             submit: async (v) => {
-                              await api(
-                                `assignments/${a.id}/submit`,
-                                "POST",
-                                v,
-                              );
+                              await api(`assignments/${a.id}/submit`, "POST", {
+                                ...v,
+                                documentId:
+                                  v.documentId === "none" ? null : v.documentId,
+                              });
                               setDetail(
                                 await api(`enrolments/${detail.enrolment.id}`),
                               );
@@ -1635,6 +1673,12 @@ export function Portal({ role }: { role: string }) {
                     <details>
                       <summary>Read response</summary>
                       <p className="preserve-text">{s.body}</p>
+                      {s.document_id && (
+                        <DocumentDownload
+                          id={s.document_id}
+                          filename={s.document_filename}
+                        />
+                      )}
                     </details>,
                     s.score == null ? "Ungraded" : `${s.score}/${s.max_score}`,
                     button("Grade", () =>

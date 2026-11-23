@@ -2,7 +2,7 @@
 
 An implemented development release for the Institute of Nature Cure & Yogic Science, Balasore. It includes a public website, role-based web workspaces, a shared PostgreSQL API, a Flutter Android client, and GCP infrastructure definitions. Advertising and marketing automation are excluded.
 
-**Status:** suitable for local functional review with synthetic data. This is not a completed production rollout. Provider integration tests, browser/device acceptance, approved client content and the remaining scope in [delivery status](docs/delivery-status.md) are required before launch. No cloud resources have been provisioned and no real payments have been collected.
+**Status:** suitable for local functional review with synthetic data. This is not a completed production rollout. Provider integration tests, browser/device acceptance, approved client content and the remaining scope in [delivery status](docs/delivery-status.md) are required before launch. Required cloud APIs are enabled and the Android Firebase app is registered, but backend/database provisioning and Hosting publication are blocked by the linked closed billing account. No real payments have been collected.
 
 ## Run locally
 
@@ -39,7 +39,7 @@ Run `npm run worker` to deliver pending in-app notifications and expire eligible
 ## What works in this release
 
 - Booking against practitioner availability with database-enforced overlap prevention; patient/practitioner clinical record access; immutable notes; care plans and session counts; gated online consultation links.
-- Course applications, admissions approval, versioned curricula, cohorts, lessons, live class links, attendance, assignment submissions/grading, timed server-graded quizzes, completion eligibility, printable certificates and QR verification.
+- Course applications, admissions approval, versioned curricula, cohorts, lessons, live class links, attendance, assignment submissions with protected attachments/grading, timed server-graded quizzes, completion eligibility, printable certificates and QR verification.
 - Vendor onboarding and product approval, stock reservation, checkout, fulfilment, 5% default commission snapshots and a balanced ledger. Full refund requests require an approver other than the requester. Late captures are preserved for reconciliation.
 - Operational enquiries, support responses, audience-specific announcements, privacy request review, private document uploads/downloads and an audit log.
 - Firebase authentication integration, staff/vendor TOTP enrollment and sign-in, verified email, password reset, server-side role checks, bounded request bodies and webhook signature verification.
@@ -50,7 +50,7 @@ The production adapters are implemented but need testing against client-owned Fi
 
 The registered `incys-institute` Firebase web app is configured in `config/firebase.web.json`; Analytics is not initialized. Firebase Hosting forwards the website and API to Cloud Run in Mumbai. Cloud SQL PostgreSQL stores application data, with Firebase Authentication for identity and a private GCS bucket for documents.
 
-The project is on **Blaze**, as authorized by the user. Follow [the deployment guide](docs/firebase-deployment.md). `npm run cloud:preflight` verifies account access and billing; `npm run cloud:deploy` provisions the services, migrates the database and publishes Hosting after readiness checks. The Firebase web API key identifies the app; deployment uses the authorized Google Cloud account.
+The project is on **Blaze**, as authorized by the user. Follow [the deployment guide](docs/firebase-deployment.md). `npm run cloud:preflight` verifies account access and the linked billing-account status; `npm run cloud:deploy` provisions the services, migrates the database and publishes Hosting after readiness checks. The Firebase web API key identifies the app; deployment uses the authorized Google Cloud account.
 
 ## Android
 
@@ -66,13 +66,16 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
 
 `10.0.2.2` reaches the host from an Android emulator. For a physical development device, use a reachable host on the same network and keep the development database private. The native client is for patients and students; staff and vendors use the responsive web workspaces.
 
-Production builds require an HTTPS API URL and Firebase Dart defines listed in [deployment](docs/deployment.md). Register the Android application ID `institute.incys.incys_mobile` in the client-owned projects. Configure a client-owned upload key using `mobile/android/key.properties.example`; the real key and properties file are ignored by Git. Release builds do not silently use the debug signing key.
+Production builds require an HTTPS API URL and Firebase Dart defines listed in [deployment](docs/deployment.md). The Android application ID `institute.incys.incys_mobile` is registered in Firebase. Use `flutter build apk --debug --dart-define-from-file=config/live.json` for a build targeting the intended live API; that API is not yet deployed. Configure a client-owned upload key using `mobile/android/key.properties.example`; the real key and properties file are ignored by Git. Release builds do not silently use the debug signing key.
 
 ## Validate
 
 ```bash
 npm run typecheck
 npm test
+npm run test:scanner
+npx playwright install chromium
+npm run test:browser
 npm run build
 npm run test:smoke
 npm run format:check
@@ -82,7 +85,7 @@ terraform init -backend=false
 terraform validate
 ```
 
-The backend test runner uses a separate database ending in `_test`, never truncates the application database, and exercises real PostgreSQL transactions. The HTTP smoke test starts and stops an isolated production server to verify routing, headers, database access and production demo-auth lockout. Flutter tests exercise session persistence, authenticated requests and permission errors. Browser UI, accessibility and physical-device acceptance remain separate checks.
+The backend test runner uses a separate database ending in `_test`, never truncates the application database, and exercises real PostgreSQL transactions. The HTTP smoke test starts and stops an isolated production server to verify routing, headers, database access and production demo-auth lockout. Flutter tests exercise session persistence, authenticated multipart uploads/downloads and permission errors. Browser tests require the local seeded demo environment and cover role navigation, a phone viewport and student-to-trainer attachment retrieval. Full accessibility and physical-device acceptance remain separate checks.
 
 ## Repository map
 

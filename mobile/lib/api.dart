@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -20,6 +21,76 @@ class InstituteApi {
   final storage = const FlutterSecureStorage();
   String? _token;
   StreamSubscription<String>? _pushRefresh;
+  Future<Map<String, String>> _headers() async {
+    final token = firebaseEnabled
+        ? await FirebaseAuth.instance.currentUser?.getIdToken()
+        : _token;
+    return {if (token != null) 'Authorization': 'Bearer $token'};
+  }
+
+  dynamic _decode(http.Response response) {
+    dynamic data;
+    try {
+      data = jsonDecode(response.body);
+    } catch (_) {
+      throw Exception(
+        'The server returned an unexpected response. Please try again.',
+      );
+    }
+    if (response.statusCode >= 400) {
+      final fields = data is Map ? data['fields'] as List? : null;
+      throw Exception(
+        fields != null
+            ? '${data['error']} ${fields.map((f) => '${f['path']}: ${f['message']}').join(' ')}'
+            : data is Map
+            ? data['error'] ?? 'The request could not be completed.'
+            : 'The request could not be completed.',
+      );
+    }
+    return data;
+  }
+
+  Future<Map<String, dynamic>> uploadDocument({
+    required String filename,
+    required Uint8List bytes,
+    required String mime,
+    required String purpose,
+  }) async {
+    if (bytes.isEmpty || bytes.length > 10 * 1024 * 1024) {
+      throw Exception('Choose a document under 10 MB.');
+    }
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$endpoint/api/v1/documents'),
+    );
+    request.headers.addAll(await _headers());
+    request.fields['purpose'] = purpose;
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: MediaType.parse(mime),
+      ),
+    );
+    final response = await request
+        .send()
+        .then(http.Response.fromStream)
+        .timeout(const Duration(seconds: 75));
+    return Map<String, dynamic>.from(_decode(response));
+  }
+
+  Future<Uint8List> downloadDocument(String id) async {
+    final response = await http
+        .get(
+          Uri.parse('$endpoint/api/v1/documents/${Uri.encodeComponent(id)}'),
+          headers: await _headers(),
+        )
+        .timeout(const Duration(seconds: 45));
+    if (response.statusCode >= 400) _decode(response);
+    return response.bodyBytes;
+  }
+
   Future<void> initialize() async {
     if (kReleaseMode && Uri.parse(endpoint).scheme != 'https') {
       throw StateError('Release builds require an HTTPS API_BASE_URL.');
@@ -45,26 +116,15 @@ class InstituteApi {
     String method = 'GET',
     Map<String, dynamic>? body,
   }) async {
-    final token = firebaseEnabled
-        ? await FirebaseAuth.instance.currentUser?.getIdToken()
-        : _token;
     final request = http.Request(method, Uri.parse('$endpoint/api/v1/$path'));
     request.headers['Content-Type'] = 'application/json';
-    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    request.headers.addAll(await _headers());
     if (body != null) request.body = jsonEncode(body);
-    final response = await http.Response.fromStream(
-      await request.send().timeout(const Duration(seconds: 25)),
-    );
-    final data = jsonDecode(response.body);
-    if (response.statusCode >= 400) {
-      final fields = data['fields'] as List?;
-      throw Exception(
-        fields != null
-            ? '${data['error']} ${fields.map((f) => '${f['path']}: ${f['message']}').join(' ')}'
-            : data['error'] ?? 'The request could not be completed.',
-      );
-    }
-    return data;
+    final response = await request
+        .send()
+        .then(http.Response.fromStream)
+        .timeout(const Duration(seconds: 25));
+    return _decode(response);
   }
 
   Future<void> signIn(String email, String password) async {

@@ -18,7 +18,8 @@
     "test:live": "node scripts/live-check.mjs",
     "format": "prettier --write app components lib server scripts tests",
     "format:check": "prettier --check app components lib server scripts tests",
-    "test:scanner": "node --test tests/scanner.test.mjs"
+    "test:scanner": "node --test tests/scanner.test.mjs",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "firebase": "^13.4.0",

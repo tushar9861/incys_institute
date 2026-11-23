@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import 'api.dart';
+import 'documents.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -828,6 +829,52 @@ class _InstituteHomeState extends State<InstituteHome> {
         ),
       ),
       heading('Support'),
+      DocumentsPanel(
+        api: widget.api,
+        documents: d['documents'] as List? ?? [],
+        onChanged: refresh,
+      ),
+      heading('Privacy requests'),
+      ...(d['privacyRequests'] as List? ?? []).map(
+        (r) => card(
+          r['request_type'],
+          '${r['status']}\n${r['response'] ?? r['message']}',
+        ),
+      ),
+      OutlinedButton.icon(
+        onPressed: () async {
+          final type = await showDialog<String>(
+            context: context,
+            builder: (ctx) => SimpleDialog(
+              title: const Text('Privacy request'),
+              children: [
+                for (final choice in const {
+                  'access': 'Access my data',
+                  'correction': 'Correct my data',
+                  'erasure': 'Request deletion',
+                }.entries)
+                  SimpleDialogOption(
+                    onPressed: () => Navigator.pop(ctx, choice.key),
+                    child: Text(choice.value),
+                  ),
+              ],
+            ),
+          );
+          if (type == null || !mounted) return;
+          final f = await input('Privacy request', ['Request details']);
+          if (f == null) return;
+          await perform(() async {
+            await widget.api.call(
+              'privacy-requests',
+              method: 'POST',
+              body: {'requestType': type, 'message': f['Request details']},
+            );
+            message('Privacy request sent for review.');
+          });
+        },
+        icon: const Icon(Icons.privacy_tip_outlined),
+        label: const Text('Request account data review'),
+      ),
       ...(d['tickets'] as List).map(
         (t) => card(
           t['subject'],
@@ -944,18 +991,36 @@ class _InstituteHomeState extends State<InstituteHome> {
           a['title'],
           '${a['instructions']}\n${a['score'] == null ? 'Due ${localDate(a['due_at'])}' : '${a['score']}/${a['max_score']} · ${a['feedback']}'}',
           actions: [
+            if (a['document_id'] != null)
+              action(
+                'Save attachment',
+                () => perform(
+                  () => saveDocument(
+                    widget.api,
+                    a['document_id'],
+                    a['document_filename'],
+                  ),
+                ),
+              ),
             if (a['score'] == null)
               action('Submit response', () async {
-                final f = await input(a['title'], ['Response']);
-                if (f != null) {
-                  await perform(() async {
-                    await widget.api.call(
-                      'assignments/${a['id']}/submit',
-                      method: 'POST',
-                      body: {'body': f['Response']},
-                    );
-                  });
-                }
+                final submitted = await showDialog<bool>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => AssignmentDialog(
+                    api: widget.api,
+                    assignment: a,
+                    documents: (data!['documents'] as List)
+                        .where(
+                          (d) =>
+                              d['owner_id'] == data!['user']['id'] &&
+                              d['purpose'] == 'assignment_attachment' &&
+                              d['state'] == 'clean',
+                        )
+                        .toList(),
+                  ),
+                );
+                if (submitted == true && mounted) await perform(() async {});
               }),
           ],
         ),
