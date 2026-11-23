@@ -1,5 +1,6 @@
 steps:
   - name: gcr.io/cloud-builders/docker
+    id: platform
     args:
       - build
       - --tag
@@ -7,8 +8,17 @@ steps:
       - --build-arg
       - DEPLOYMENT_VERSION=$BUILD_ID
       - .
+  - name: gcr.io/cloud-builders/docker
+    id: scanner
+    waitFor: ["-"]
+    args:
+      - build
+      - --tag
+      - asia-south1-docker.pkg.dev/$PROJECT_ID/incys/scanner:$BUILD_ID
+      - services/scanner
 images:
   - asia-south1-docker.pkg.dev/$PROJECT_ID/incys/platform:$BUILD_ID
+  - asia-south1-docker.pkg.dev/$PROJECT_ID/incys/scanner:$BUILD_ID
 timeout: 1200s
 options:
   logging: CLOUD_LOGGING_ONLY

@@ -1,6 +1,7 @@
 project_id = "incys-institute"
 region = "asia-south1"
 container_image = "asia-south1-docker.pkg.dev/incys-institute/incys/platform:REPLACE_WITH_BUILD_ID"
+scanner_image = "asia-south1-docker.pkg.dev/incys-institute/incys/scanner:REPLACE_WITH_BUILD_ID"
 app_origin = "https://incys-institute.web.app"
 database_url_secret = "incys-runtime-database-url"
 migration_database_url_secret = "incys-migration-database-url"

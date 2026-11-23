@@ -41,9 +41,9 @@ This is a substantial development release, **not every feature in the PDFs compl
 6. Admin manages staff roles, responds to support/privacy requests and reviews audit events. Verify deactivated users and revoked sessions lose access immediately.
 7. Run the same supported patient/student journeys on Android, including network interruption, app restart, expired authentication and denied notification permission.
 
-## Current hosting constraint
+## Current deployment
 
-The user selected Firebase Spark on 23 November 2026. Registered Firebase client configuration and conditional GCP deployment automation are prepared, but Cloud Run/regular Cloud SQL/Storage provisioning is paused. A Spark-only deployment cannot host the existing server and database. See [Firebase deployment](firebase-deployment.md) for supported services and alternatives. No live publication has occurred.
+The user enabled Blaze on 23 November 2026 and authorized the full backend architecture. Cloud Billing and project access have been verified. Firebase Hosting, Cloud Run, Cloud SQL, private storage, a private malware scanner and scheduled jobs are configured for deployment. Live publication and acceptance must be verified separately. See [Firebase deployment](firebase-deployment.md).
 
 ## Inputs needed to finish launch
 

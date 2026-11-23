@@ -17,11 +17,13 @@
     "cloud:deploy": "python3 scripts/deploy-gcp.py --apply",
     "test:live": "node scripts/live-check.mjs",
     "format": "prettier --write app components lib server scripts tests",
-    "format:check": "prettier --check app components lib server scripts tests"
+    "format:check": "prettier --check app components lib server scripts tests",
+    "test:scanner": "node --test tests/scanner.test.mjs"
   },
   "dependencies": {
     "firebase": "^13.4.0",
     "firebase-admin": "^14.5.1",
+    "google-auth-library": "^11.3.4",
     "lucide-react": "1.77.0",
     "next": "16.4.6",
     "pg": "8.23.1",
@@ -32,11 +34,13 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.15.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "firebase-tools": "^15.37.0",
     "prettier": "^3.10.1",
     "typescript": "^5.9.0"
   },

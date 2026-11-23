@@ -2,7 +2,7 @@
 
 No infrastructure apply, live payment request or release publication has been performed. Use client-owned accounts and configure credentials through the deployment environment or Secret Manager, never in Git or chat.
 
-**Current instruction: stay on Spark.** The prepared GCP stack below needs Blaze and is paused. See the [INCYS Firebase guide](firebase-deployment.md) for the current compatibility assessment and conditional deployment procedure. The deploy script blocks paid provisioning while `config/deployment.json` records Spark.
+The user enabled Blaze and authorized full GCP deployment. See the [INCYS Firebase guide](firebase-deployment.md) for the current stack and automated deployment procedure.
 
 ## Local review
 
@@ -35,7 +35,7 @@ Build from the repository root using the Dockerfile. The registered Firebase con
 
 Run `incys-migrate` as a one-off Cloud Run job before routing users to the new revision. Migrations are transactional and tracked in `schema_migrations`; serialize deployment migrations. The finite `incys-worker` job processes at most 100 outbox events and 100 expired reservations per execution. The Scheduler resource starts **paused**. Unpause it only after migration and worker verification. Alert when the outbox backlog grows beyond the job's capacity.
 
-The current Terraform grants the application access to the named secrets, Cloud SQL, its private bucket, Firebase identity reads and FCM delivery. It supports optional VPC network/subnetwork settings for a private scanner. Configure a reachable ClamAV host and health monitoring; no scanner service is provisioned automatically. Uploaded documents fail closed until both private storage and scanning are available.
+The current Terraform grants the application access to the named secrets, Cloud SQL, its private bucket, Firebase identity reads and FCM delivery. It provisions an IAM-protected ClamAV HTTP scanner with its own unprivileged service identity. Only the application can invoke it. The optional private TCP scanner configuration remains available for an externally managed scanner. Uploaded documents fail closed if storage, scanning or fresh signatures are unavailable.
 
 Terraform does not configure custom DNS/TLS routing, Cloud Armor/WAF, budget alerts, uptime checks or centralized alert destinations. Complete those in the client project. The provided SQL backup/PITR configuration must be validated with a restore drill; it is not evidence of a tested recovery objective.
 

@@ -36,7 +36,11 @@ def run(exe, args, *, data=None, env=None, cwd=ROOT):
                             cwd=cwd, env=env, check=False)
     if result.returncode:
         # Command output may contain credentials. Surface only the operation.
-        raise RuntimeError(f'{Path(exe).name} operation failed: {args[0]}. Check access, configuration and provider status.')
+        diagnostic = ROOT / '.deploy' / 'last-error.log'
+        diagnostic.parent.mkdir(mode=0o700, exist_ok=True)
+        diagnostic.write_text(result.stderr)
+        diagnostic.chmod(0o600)
+        raise RuntimeError(f'{Path(exe).name} operation failed: {args[0]}. Private diagnostics: .deploy/last-error.log')
     return result.stdout.strip()
 
 
@@ -101,7 +105,7 @@ def configure_identity(env):
     token = run(GCLOUD, ['auth', 'print-access-token'])
     req = urllib.request.Request(
         f'https://identitytoolkit.googleapis.com/admin/v2/projects/{PROJECT}/config',
-        headers={'Authorization': 'Bearer ' + token})
+        headers={'Authorization': 'Bearer ' + token, 'x-goog-user-project': PROJECT})
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
             current = json.load(response)
@@ -139,6 +143,8 @@ def wait_ready(url):
 
 
 def deploy():
+    # Firebase CLI's bearer-token transport needs an explicit ADC quota project.
+    os.environ['GOOGLE_CLOUD_QUOTA_PROJECT'] = PROJECT
     for binary in [TERRAFORM, FIREBASE]:
         if not shutil.which(binary):
             raise RuntimeError(f'{binary} must be installed before applying.')
@@ -166,6 +172,7 @@ def deploy():
     env.update({
         'TF_VAR_project_id': PROJECT, 'TF_VAR_region': REGION,
         'TF_VAR_container_image': f'{REGION}-docker.pkg.dev/{PROJECT}/incys/platform:initial',
+        'TF_VAR_scanner_image': f'{REGION}-docker.pkg.dev/{PROJECT}/incys/scanner:initial',
         'TF_VAR_app_origin': ORIGIN, 'TF_VAR_database_url_secret': RUNTIME_SECRET,
         'TF_VAR_migration_database_url_secret': MIGRATION_SECRET,
         'TF_VAR_database_password': urllib.parse.unquote(urllib.parse.urlparse(migration).password),
@@ -182,13 +189,23 @@ def deploy():
                     'google_sql_user.application', 'google_sql_database.application',
                     'google_storage_bucket.private'])
     print('Building the versioned application image in Cloud Build.')
-    build = json.loads(gc('builds', 'submit', '--config=cloudbuild.yaml', '--format=json',
+    build = json.loads(gc('builds', 'submit', '--config=cloudbuild.yaml', '--format=json', '--async',
                          '--region='+REGION,
                          '--service-account=projects/'+PROJECT+'/serviceAccounts/incys-builder@'+PROJECT+'.iam.gserviceaccount.com',
                          '--gcs-source-staging-dir=gs://'+PROJECT+'-incys-build-source/source', '.'))
-    if build.get('status') != 'SUCCESS':
-        raise RuntimeError('Cloud Build did not succeed.')
+    build_id = build['id']
+    print(f'Cloud Build started: {build_id}')
+    for _ in range(260):
+        build = json.loads(gc('builds', 'describe', build_id, '--region=' + REGION, '--format=json'))
+        if build.get('status') == 'SUCCESS':
+            break
+        if build.get('status') in ['FAILURE', 'INTERNAL_ERROR', 'TIMEOUT', 'CANCELLED', 'EXPIRED']:
+            raise RuntimeError(f'Cloud Build {build_id} ended with {build["status"]}. Inspect build logs before retrying.')
+        time.sleep(5)
+    else:
+        raise RuntimeError(f'Cloud Build {build_id} has not completed. Inspect it before starting another build.')
     env['TF_VAR_container_image'] = f'{REGION}-docker.pkg.dev/{PROJECT}/incys/platform:{build["id"]}'
+    env['TF_VAR_scanner_image'] = f'{REGION}-docker.pkg.dev/{PROJECT}/incys/scanner:{build["id"]}'
     configure_identity(env)
     print('Applying Cloud Run, identity, database access and scheduled jobs.')
     apply_plan(env)

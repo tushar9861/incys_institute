@@ -8,8 +8,10 @@ terraform {
   backend "gcs" {}
 }
 provider "google" {
-  project = var.project_id
-  region  = var.region
+  project               = var.project_id
+  region                = var.region
+  user_project_override = true
+  billing_project       = var.project_id
 }
 variable "project_id" {
   type = string
@@ -207,6 +209,10 @@ resource "google_cloud_run_v2_service" "application" {
       env {
         name  = "CLAMAV_HOST"
         value = var.clamav_host
+      }
+      env {
+        name  = "SCAN_SERVICE_URL"
+        value = google_cloud_run_v2_service.scanner.uri
       }
       dynamic "env" {
         for_each = var.runtime_secrets

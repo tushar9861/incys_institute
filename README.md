@@ -50,7 +50,7 @@ The production adapters are implemented but need testing against client-owned Fi
 
 The registered `incys-institute` Firebase web app is configured in `config/firebase.web.json`; Analytics is not initialized. Firebase Hosting forwards the website and API to Cloud Run in Mumbai. Cloud SQL PostgreSQL stores application data, with Firebase Authentication for identity and a private GCS bucket for documents.
 
-**Current constraint: stay on Firebase Spark.** The Cloud Run/Cloud SQL deployment below requires Blaze and is paused. No paid infrastructure is authorized under this constraint. Follow [the project deployment guide](docs/firebase-deployment.md) for compatibility and the conditional deployment procedure. `npm run cloud:preflight` is read-only; `npm run cloud:deploy` refuses to proceed while the saved plan is Spark. The supplied web API key does not grant deployment access. **This configuration has not been applied to GCP yet.**
+The project is on **Blaze**, as authorized by the user. Follow [the deployment guide](docs/firebase-deployment.md). `npm run cloud:preflight` verifies account access and billing; `npm run cloud:deploy` provisions the services, migrates the database and publishes Hosting after readiness checks. The Firebase web API key identifies the app; deployment uses the authorized Google Cloud account.
 
 ## Android
 

@@ -1,6 +1,7 @@
 project_id = "your-client-owned-project"
 region = "asia-south1"
 container_image = "asia-south1-docker.pkg.dev/your-client-owned-project/incys/platform:COMMIT_SHA"
+scanner_image = "asia-south1-docker.pkg.dev/your-client-owned-project/incys/scanner:COMMIT_SHA"
 app_origin = "https://your-approved-domain.example"
 database_url_secret = "incys-runtime-database-url"
 migration_database_url_secret = "incys-migration-database-url"

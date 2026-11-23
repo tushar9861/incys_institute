@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { connect } from "node:net";
 import { mkdir, writeFile, readFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { getApps, initializeApp, applicationDefault } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { one, rows, pool, transaction, audit } from "./db";
-import { authenticate, has, isDemo, type User } from "./auth";
+import { authenticate, has, isDemo, throttle, type User } from "./auth";
 import { AppError, requireThat } from "./errors";
 import { boundedBody } from "./request-body";
 import { allowedOrigin } from "./origin";
+import { scanDocument } from "./scan";
 const allowed = ["application/pdf", "image/jpeg", "image/png"];
 function storage() {
   if (!getApps().length)
@@ -17,53 +17,6 @@ function storage() {
       projectId: process.env.FIREBASE_PROJECT_ID,
     });
   return getStorage().bucket(process.env.GCS_PRIVATE_BUCKET);
-}
-async function scan(bytes: Buffer) {
-  if (isDemo()) return; // Explicit local synthetic-data mode only. Production always requires the scanner.
-  requireThat(
-    process.env.CLAMAV_HOST,
-    503,
-    "Document scanning is not configured. Contact the institute before uploading.",
-  );
-  await new Promise<void>((resolve, reject) => {
-    const socket = connect(
-      Number(process.env.CLAMAV_PORT || 3310),
-      process.env.CLAMAV_HOST,
-    );
-    let response = "";
-    socket.setTimeout(20000, () =>
-      socket.destroy(new Error("Scanner timed out.")),
-    );
-    socket.on("connect", () => {
-      socket.write("zINSTREAM\0");
-      for (let i = 0; i < bytes.length; i += 65536) {
-        const chunk = bytes.subarray(i, i + 65536),
-          length = Buffer.alloc(4);
-        length.writeUInt32BE(chunk.length);
-        socket.write(length);
-        socket.write(chunk);
-      }
-      socket.write(Buffer.alloc(4));
-    });
-    socket.on("data", (data) => {
-      response += data.toString();
-      if (response.includes("\0")) {
-        socket.end();
-        response.includes("stream: OK")
-          ? resolve()
-          : reject(new AppError(422, "The file did not pass the safety scan."));
-      }
-    });
-    socket.on("error", () =>
-      reject(
-        new AppError(503, "Document scanning is temporarily unavailable."),
-      ),
-    );
-    socket.on("end", () => {
-      if (!response.includes("\0"))
-        reject(new AppError(503, "Incomplete scanner response."));
-    });
-  });
 }
 function signatureMatches(bytes: Buffer, mime: string) {
   return mime === "application/pdf"
@@ -122,7 +75,8 @@ export async function uploadDocument(request: Request) {
     400,
     "The file content does not match its declared format.",
   );
-  await scan(bytes);
+  await throttle(`document-upload:${user.id}`, 20, 3600);
+  await scanDocument(bytes);
   const key = `documents/${user.id}/${randomUUID()}`;
   if (process.env.GCS_PRIVATE_BUCKET)
     await storage()
