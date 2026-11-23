@@ -17,6 +17,7 @@ import * as platform from "./platform";
 import * as assessments from "./assessments";
 import * as refunds from "./refunds";
 import { boundedBody } from "./request-body";
+import { allowedOrigin } from "./origin";
 function json(
   data: unknown,
   status = 200,
@@ -35,15 +36,11 @@ export async function route(request: Request, path: string[]) {
     if (mutation && key !== "payments/webhook") {
       const origin = request.headers.get("origin");
       if (origin)
-        requireThat(
-          origin === process.env.APP_ORIGIN,
-          403,
-          "Unrecognized request origin.",
-        );
+        requireThat(allowedOrigin(origin), 403, "Unrecognized request origin.");
       // Browser cookies require same-origin protection. Native clients authenticate via bearer token.
       if (request.headers.get("cookie")?.includes("incys_session="))
         requireThat(
-          origin === process.env.APP_ORIGIN,
+          allowedOrigin(origin),
           403,
           "A same-origin request is required.",
         );
@@ -65,8 +62,13 @@ export async function route(request: Request, path: string[]) {
         }
       }
     }
+    if (key === "livez" && method === "GET")
+      return json({
+        status: "alive",
+        version: process.env.DEPLOYMENT_VERSION || "development",
+      });
     if (key === "health" && method === "GET") {
-      await pool.query("SELECT 1");
+      await pool.query("SELECT 1 FROM services LIMIT 0");
       return json({ status: "ok" });
     }
     if (key === "config" && method === "GET")

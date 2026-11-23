@@ -13,6 +13,9 @@
     "test": "tsx --env-file=.env.local scripts/test.ts",
     "worker": "tsx --env-file=.env.local scripts/worker.ts",
     "test:smoke": "tsx --env-file=.env.local scripts/smoke.ts",
+    "cloud:preflight": "python3 scripts/deploy-gcp.py",
+    "cloud:deploy": "python3 scripts/deploy-gcp.py --apply",
+    "test:live": "node scripts/live-check.mjs",
     "format": "prettier --write app components lib server scripts tests",
     "format:check": "prettier --check app components lib server scripts tests"
   },

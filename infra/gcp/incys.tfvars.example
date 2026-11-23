@@ -1,0 +1,13 @@
+project_id = "incys-institute"
+region = "asia-south1"
+container_image = "asia-south1-docker.pkg.dev/incys-institute/incys/platform:REPLACE_WITH_BUILD_ID"
+app_origin = "https://incys-institute.web.app"
+database_url_secret = "incys-runtime-database-url"
+migration_database_url_secret = "incys-migration-database-url"
+database_tier = "db-custom-1-3840"
+# Initial live integration environment; upgrade to REGIONAL before final production acceptance.
+availability_type = "ZONAL"
+scheduler_paused = true
+# Inspect/import the existing auth configuration before setting true.
+manage_identity = false
+identity_authorized_domains = ["incys-institute.web.app", "incys-institute.firebaseapp.com"]

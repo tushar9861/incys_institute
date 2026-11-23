@@ -1,0 +1,14 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - asia-south1-docker.pkg.dev/$PROJECT_ID/incys/platform:$BUILD_ID
+      - --build-arg
+      - DEPLOYMENT_VERSION=$BUILD_ID
+      - .
+images:
+  - asia-south1-docker.pkg.dev/$PROJECT_ID/incys/platform:$BUILD_ID
+timeout: 1200s
+options:
+  logging: CLOUD_LOGGING_ONLY

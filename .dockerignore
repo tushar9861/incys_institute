@@ -14,3 +14,8 @@ infra/gcp/.terraform
 *.jks
 *.keystore
 key.properties
+.deploy
+.firebase
+firebase-debug.log
+__pycache__
+*.pyc

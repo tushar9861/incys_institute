@@ -5,7 +5,7 @@ terraform {
       source = "hashicorp/google", version = "~> 7.0"
     }
   }
-  # Configure an encrypted, access-controlled GCS state backend before applying.
+  backend "gcs" {}
 }
 provider "google" {
   project = var.project_id
@@ -45,7 +45,7 @@ variable "availability_type" {
   }
 }
 locals {
-  services = toset(["run.googleapis.com", "sqladmin.googleapis.com", "secretmanager.googleapis.com", "artifactregistry.googleapis.com", "cloudscheduler.googleapis.com", "storage.googleapis.com", "identitytoolkit.googleapis.com", "firebase.googleapis.com"])
+  services = toset(["run.googleapis.com", "sqladmin.googleapis.com", "secretmanager.googleapis.com", "artifactregistry.googleapis.com", "cloudscheduler.googleapis.com", "storage.googleapis.com", "identitytoolkit.googleapis.com", "firebase.googleapis.com", "firebasehosting.googleapis.com", "cloudbuild.googleapis.com", "logging.googleapis.com", "iam.googleapis.com", "cloudresourcemanager.googleapis.com"])
 }
 resource "google_project_service" "apis" {
   for_each           = local.services
@@ -74,6 +74,7 @@ resource "google_sql_database_instance" "database" {
   deletion_protection = true
   depends_on          = [google_project_service.apis]
   settings {
+    edition                     = "ENTERPRISE"
     tier                        = var.database_tier
     availability_type           = var.availability_type
     disk_size                   = 20
@@ -105,7 +106,7 @@ resource "google_sql_database" "application" {
   instance = google_sql_database_instance.database.name
 }
 resource "google_sql_user" "application" {
-  name     = "incys_app"
+  name     = "incys_migrator"
   instance = google_sql_database_instance.database.name
   password = var.database_password
 }
@@ -219,9 +220,13 @@ resource "google_cloud_run_v2_service" "application" {
           }
         }
       }
+      env {
+        name  = "ALLOWED_ORIGINS"
+        value = "${var.app_origin},https://${var.project_id}.firebaseapp.com"
+      }
       startup_probe {
         http_get {
-          path = "/api/v1/health"
+          path = "/api/v1/livez"
           port = 8080
         }
         initial_delay_seconds = 5

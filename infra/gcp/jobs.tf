@@ -35,16 +35,16 @@ resource "google_project_iam_member" "push" {
   member  = "serviceAccount:${google_service_account.application.email}"
 }
 resource "google_cloud_run_v2_job" "operations" {
-  for_each            = toset(["worker", "migrate"])
+  for_each            = toset(["worker", "migrate", "bootstrap-admin"])
   name                = "incys-${each.key}"
   location            = var.region
   deletion_protection = true
-  depends_on          = [google_project_iam_member.sql_client, google_secret_manager_secret_iam_member.database]
+  depends_on          = [google_project_iam_member.sql_client, google_secret_manager_secret_iam_member.database, google_secret_manager_secret_iam_member.migrations, google_project_iam_member.migration_sql]
   template {
     task_count  = 1
     parallelism = 1
     template {
-      service_account = google_service_account.application.email
+      service_account = each.key == "migrate" ? google_service_account.migrations.email : google_service_account.application.email
       timeout         = "300s"
       max_retries     = 1
       volumes {
@@ -56,7 +56,7 @@ resource "google_cloud_run_v2_job" "operations" {
       containers {
         image   = var.container_image
         command = ["node", "--import", "tsx"]
-        args    = ["scripts/${each.key}.ts"]
+        args    = [each.key == "migrate" ? "scripts/prepare-database.ts" : "scripts/${each.key}.ts"]
         resources {
           limits = {
             cpu = "1", memory = "512Mi"
@@ -70,8 +70,20 @@ resource "google_cloud_run_v2_job" "operations" {
           name = "DATABASE_URL"
           value_source {
             secret_key_ref {
-              secret  = var.database_url_secret
+              secret  = each.key == "migrate" ? var.migration_database_url_secret : var.database_url_secret
               version = "latest"
+            }
+          }
+        }
+        dynamic "env" {
+          for_each = each.key == "migrate" ? [1] : []
+          content {
+            name = "RUNTIME_DATABASE_URL"
+            value_source {
+              secret_key_ref {
+                secret  = var.database_url_secret
+                version = "latest"
+              }
             }
           }
         }
@@ -107,7 +119,7 @@ resource "google_cloud_scheduler_job" "worker" {
   region     = var.region
   schedule   = "*/5 * * * *"
   time_zone  = "Asia/Kolkata"
-  paused     = true # Unpause only after migrations and deployment verification.
+  paused     = var.scheduler_paused
   depends_on = [google_project_service.apis, google_cloud_run_v2_job_iam_member.worker_invoker]
   http_target {
     http_method = "POST"

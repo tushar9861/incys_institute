@@ -8,6 +8,7 @@ import { one, rows, pool, transaction, audit } from "./db";
 import { authenticate, has, isDemo, type User } from "./auth";
 import { AppError, requireThat } from "./errors";
 import { boundedBody } from "./request-body";
+import { allowedOrigin } from "./origin";
 const allowed = ["application/pdf", "image/jpeg", "image/png"];
 function storage() {
   if (!getApps().length)
@@ -77,13 +78,13 @@ export async function uploadDocument(request: Request) {
   const user = await authenticate(request);
   const origin = request.headers.get("origin");
   requireThat(
-    !origin || origin === process.env.APP_ORIGIN,
+    !origin || allowedOrigin(origin),
     403,
     "Unrecognized request origin.",
   );
   if (request.headers.get("cookie")?.includes("incys_session="))
     requireThat(
-      origin === process.env.APP_ORIGIN,
+      allowedOrigin(origin),
       403,
       "A same-origin request is required.",
     );

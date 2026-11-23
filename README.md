@@ -46,6 +46,12 @@ Run `npm run worker` to deliver pending in-app notifications and expire eligible
 
 The production adapters are implemented but need testing against client-owned Firebase, Razorpay, GCS and scanning services. Meeting URLs open an external provider; automated room provisioning and short-lived participant tokens are not yet implemented.
 
+## Firebase and GCP deployment
+
+The registered `incys-institute` Firebase web app is configured in `config/firebase.web.json`; Analytics is not initialized. Firebase Hosting forwards the website and API to Cloud Run in Mumbai. Cloud SQL PostgreSQL stores application data, with Firebase Authentication for identity and a private GCS bucket for documents.
+
+**Current constraint: stay on Firebase Spark.** The Cloud Run/Cloud SQL deployment below requires Blaze and is paused. No paid infrastructure is authorized under this constraint. Follow [the project deployment guide](docs/firebase-deployment.md) for compatibility and the conditional deployment procedure. `npm run cloud:preflight` is read-only; `npm run cloud:deploy` refuses to proceed while the saved plan is Spark. The supplied web API key does not grant deployment access. **This configuration has not been applied to GCP yet.**
+
 ## Android
 
 Use Flutter **3.50.1** with a full Java 21 JDK and Android SDK platforms 34, 35 and 36. Flutter installs its matching NDK when required.

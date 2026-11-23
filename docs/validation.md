@@ -4,7 +4,7 @@ This records observed checks in the development environment, not a production ac
 
 | Check                                                       | Result                                                                                                                 |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| PostgreSQL integration suite                                | **19 passed**, including concurrency, authorization, accounting, assessment timing, file access and worker idempotency |
+| PostgreSQL integration suite                                | **21 passed**, including concurrency, authorization, accounting, assessment timing, file access, worker idempotency, restricted runtime database privileges and exact Hosting origins |
 | TypeScript                                                  | Passed                                                                                                                 |
 | Optimized Next production build                             | Passed                                                                                                                 |
 | Production HTTP smoke                                       | Passed: pages, headers, database, catalogue and local/demo authentication disabled                                     |
@@ -20,6 +20,8 @@ This records observed checks in the development environment, not a production ac
 | Browser, responsive visual and accessibility review         | **Blocked** by unavailable browser runtime / preview relay                                                             |
 | Physical Android-device and provider acceptance             | **Not performed**                                                                                                      |
 | GCP plan/apply, recovery/load tests, signed Android release | **Not performed**                                                                                                      |
+
+Firebase deployment preparation was rechecked locally: production build, HTTP smoke, typecheck, formatting and Terraform validation passed. The read-only deployment preflight stopped because no GCP account is signed in. The user's subsequent Spark decision pauses paid provisioning independently of credentials; the apply command now refuses before calling any cloud CLI. No Hosting publication, cloud database or live provider acceptance has occurred. Firebase CLI dependency installation and public endpoint probes also encountered environment network HTTP 503 responses, which do not establish the project's service status.
 
 The container build used the environment's approved CA bundle through an optional BuildKit secret. Android dependency downloads used the environment proxy and existing system Java trust store. Certificate verification remained enabled. These environment-specific settings are not embedded in application source or release credentials.
 

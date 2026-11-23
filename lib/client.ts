@@ -1,5 +1,7 @@
 "use client";
 import { initializeApp, getApps } from "firebase/app";
+import { firebaseConfig, firebaseEnabled } from "./firebase-config";
+export { firebaseEnabled } from "./firebase-config";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -15,9 +17,6 @@ import {
   type MultiFactorError,
   type TotpSecret,
 } from "firebase/auth";
-export const firebaseEnabled = Boolean(
-  process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-);
 export async function authHeaders(): Promise<Record<string, string>> {
   if (!firebaseEnabled) return {};
   await auth().authStateReady();
@@ -25,12 +24,7 @@ export async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 function auth() {
-  if (!getApps().length)
-    initializeApp({
-      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    });
+  if (!getApps().length) initializeApp(firebaseConfig);
   return getAuth();
 }
 export async function api<T = any>(

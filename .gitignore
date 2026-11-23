@@ -18,3 +18,7 @@ uploads/
 key.properties
 *.jks
 *.keystore
+.deploy/
+.firebase/
+__pycache__/
+*.pyc

@@ -16,7 +16,7 @@ Working scope comes from the three supplied AI-generated drafts: `INCYS_Integrat
 | Finance              | Captures, balanced postings, full refund review, reversals and late-capture reconciliation records                                                             | Provider test/live validation, automated reconciliation, installments, GST invoices and bank settlements                                                                                  |
 | Administration       | Access roles, admissions, vendor/product approval, announcements, enquiries, support, privacy reviews and audit                                                | Bulk import/export, configurable reports, institution policy templates and team onboarding acceptance                                                                                     |
 | Android              | Native patient/student home, bookings, records, learning, quizzes, shopping, checkout, support and encrypted session storage                                   | Real-device acceptance, document upload UI, native privacy requests, full offline behavior, release signing and Play publication                                                          |
-| Security             | Server authorization, staff/vendor MFA integration, bounded bodies, signed webhooks, immutable records, private uploads and scanning adapter                   | Live identity/scanner validation, scoped database runtime principal, full CSP/WAF, threat review, independent security assessment and recovery procedures                                 |
+| Security             | Server authorization, staff/vendor MFA integration, bounded bodies, signed webhooks, immutable records, private uploads, scanning adapter and a restricted runtime database role                   | Live identity/scanner validation, full CSP/WAF, threat review, independent security assessment and recovery procedures                                 |
 | GCP                  | Validated Terraform for service/database/storage/jobs/IAM, container and CI definitions                                                                        | Client cloud credentials, provisioning, identity/scanner setup, domains, monitoring, budgets, restore drills, load tests and reviewed production rollout                                  |
 | Events               | Transactional outbox, deduplicated durable in-app notifications, scheduled worker, optional FCM                                                                | Pub/Sub/Cloud Tasks transport, DLQ/retry operations and reliable push retry                                                                                                               |
 
@@ -40,6 +40,10 @@ This is a substantial development release, **not every feature in the PDFs compl
 5. Finance handles duplicate captures, late captures, full refunds and provider timeouts without duplicate money postings or stock returns. Confirm provider statements against the ledger.
 6. Admin manages staff roles, responds to support/privacy requests and reviews audit events. Verify deactivated users and revoked sessions lose access immediately.
 7. Run the same supported patient/student journeys on Android, including network interruption, app restart, expired authentication and denied notification permission.
+
+## Current hosting constraint
+
+The user selected Firebase Spark on 23 November 2026. Registered Firebase client configuration and conditional GCP deployment automation are prepared, but Cloud Run/regular Cloud SQL/Storage provisioning is paused. A Spark-only deployment cannot host the existing server and database. See [Firebase deployment](firebase-deployment.md) for supported services and alternatives. No live publication has occurred.
 
 ## Inputs needed to finish launch
 

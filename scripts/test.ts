@@ -40,4 +40,9 @@ async function run(args: string[]) {
   });
 }
 await run(["scripts/migrate.ts"]);
-await run(["--test", "--test-concurrency=1", "tests/platform.test.ts"]);
+await run([
+  "--test",
+  "--test-concurrency=1",
+  "tests/platform.test.ts",
+  "tests/deployment.test.ts",
+]);

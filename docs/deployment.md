@@ -2,6 +2,8 @@
 
 No infrastructure apply, live payment request or release publication has been performed. Use client-owned accounts and configure credentials through the deployment environment or Secret Manager, never in Git or chat.
 
+**Current instruction: stay on Spark.** The prepared GCP stack below needs Blaze and is paused. See the [INCYS Firebase guide](firebase-deployment.md) for the current compatibility assessment and conditional deployment procedure. The deploy script blocks paid provisioning while `config/deployment.json` records Spark.
+
 ## Local review
 
 Follow the root README. Review with synthetic data and the eight demo accounts. Confirm workflows against `delivery-status.md`; draft AI documents are not a signed acceptance specification. Before loading any live records, complete provider integration, security and acceptance checks below.
@@ -12,12 +14,12 @@ Follow the root README. Review with synthetic data and the eight demo accounts. 
 2. Copy `infra/gcp/terraform.tfvars.example` into a local ignored tfvars file. Set `TF_VAR_database_password` through a secret binding. Review HA, retention, monthly costs and the five-instance application limit with the client.
 3. Provision the foundational resources before pushing the first image. For initial bootstrap only, target the Artifact Registry repository, SQL database/user and storage bucket, review the plan, and apply that plan. Follow with a complete plan/apply after the image and secrets exist. Do not leave the project running indefinitely on a targeted plan.
 4. Add the PostgreSQL connection string to the existing Secret Manager secret named by `database_url_secret`. Example shape: `postgresql://incys_app:URL_ENCODED_PASSWORD@localhost/incys?host=/cloudsql/PROJECT:REGION:incys-postgres`. Use the actual instance connection name and URL-encode the password. Do not expose Cloud SQL to authorized public IP networks.
-5. Before accepting live data, create separate migration and runtime database principals. The migration owner runs schema changes; the runtime needs table SELECT/INSERT/UPDATE as required and DELETE only for operational ephemeral tables. Retain append-only triggers and deny DDL/TRUNCATE to the runtime. Update job/service secret bindings accordingly. The supplied Terraform uses one initial database principal and does not automate this separation.
+5. The migration job now runs `scripts/prepare-database.ts`, creating the schema as `incys_migrator` and provisioning the separate `incys_app` runtime role. Runtime cannot create schema objects, truncate tables, read migration metadata or update/delete protected clinical, audit and ledger history. Local PostgreSQL tests verify these restrictions. Use the separate runtime and migration Secret Manager bindings in the supplied Terraform.
 
 ## Identity
 
 - Configure Firebase / Identity Platform in the same project, enable email/password, email verification and TOTP MFA, and add the approved web domains. Configure email templates, sender domain and password policy.
-- Supply `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, and `NEXT_PUBLIC_FIREBASE_PROJECT_ID` at **image build time**. These are public application configuration. Server Firebase Admin uses workload Application Default Credentials and `FIREBASE_PROJECT_ID`; do not ship a service-account JSON key in the image.
+- The supplied INCYS web registration is in `config/firebase.web.json`; optional `NEXT_PUBLIC_FIREBASE_*` overrides are read at **image build time**. These are public application configuration. Server Firebase Admin uses workload Application Default Credentials and `FIREBASE_PROJECT_ID`; do not ship a service-account JSON key in the image. Analytics is not initialized.
 - In production set `AUTH_MODE=firebase`, `DEMO_MODE=false`, `NODE_ENV=production`, and `APP_ORIGIN` to the exact external HTTPS origin, without a trailing slash.
 - Create and verify the first administrator's Firebase identity, then run the operator-only command against the intended production database:
 
@@ -29,7 +31,7 @@ The script requires `DATABASE_URL`, `FIREBASE_PROJECT_ID` and ADC, refuses misma
 
 ## Image and infrastructure
 
-Build from the repository root using the Dockerfile. Pass the three public Firebase build arguments, tag with a commit SHA, push to the client Artifact Registry repository, and set `container_image` to that exact image. Review a full Terraform plan before applying it. The resulting service starts without demo sign-in. In an environment with an approved TLS inspection CA, pass its trust bundle as the optional BuildKit secret `build_ca`; it is mounted only during dependency installation and is not baked into the image. Do not disable certificate verification.
+Build from the repository root using the Dockerfile. The registered Firebase configuration is included by default; optional build arguments can override it. `cloudbuild.yaml` tags the image and deployment version with its unique Cloud Build ID. Review a full Terraform plan before applying it. The resulting service starts without demo sign-in. In an environment with an approved TLS inspection CA, pass its trust bundle as the optional BuildKit secret `build_ca`; it is mounted only during dependency installation and is not baked into the image. Do not disable certificate verification.
 
 Run `incys-migrate` as a one-off Cloud Run job before routing users to the new revision. Migrations are transactional and tracked in `schema_migrations`; serialize deployment migrations. The finite `incys-worker` job processes at most 100 outbox events and 100 expired reservations per execution. The Scheduler resource starts **paused**. Unpause it only after migration and worker verification. Alert when the outbox backlog grows beyond the job's capacity.
 
