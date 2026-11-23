@@ -83,6 +83,8 @@ export function Documents({
       <h2>Authorized documents</h2>
       <p className="muted">
         Upload reports or academic documents as PDF, JPEG or PNG. Maximum 10 MB.
+        Files awaiting a safety check cannot be downloaded or submitted as
+        coursework.
       </p>
       <form onSubmit={upload}>
         <div className="form-grid">
@@ -135,7 +137,15 @@ export function Documents({
                 <td>{d.purpose.replaceAll("_", " ")}</td>
                 <td>{Math.ceil(d.size_bytes / 1024)} KB</td>
                 <td>
-                  <DocumentDownload id={d.id} filename={d.filename} />
+                  {d.state === "clean" ? (
+                    <DocumentDownload id={d.id} filename={d.filename} />
+                  ) : (
+                    <span>
+                      {d.state === "quarantined"
+                        ? "Awaiting safety check"
+                        : "Rejected by safety check"}
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}

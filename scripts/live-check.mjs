@@ -6,7 +6,7 @@ assert.equal(new URL(base).protocol, "https:", "Live checks require HTTPS.");
 const checks = [];
 async function get(path, status = 200) {
   const r = await fetch(base + path, {
-    signal: AbortSignal.timeout(55000),
+    signal: AbortSignal.timeout(90000),
     redirect: "error",
   });
   assert.equal(r.status, status, path);
@@ -17,8 +17,8 @@ assert.equal(health.status, "ok");
 checks.push("Database readiness");
 const config = await (await get("/api/v1/config")).json();
 assert.equal(config.demo, false);
-assert.equal(config.authMode, "firebase");
-checks.push("Firebase auth and demo capture disabled");
+assert.ok(["firebase", "supabase"].includes(config.authMode));
+checks.push(`${config.authMode} auth and demo capture disabled`);
 await get("/");
 await get("/login");
 await get("/api/v1/workspace", 401);
@@ -42,12 +42,12 @@ checks.push("Cross-origin mutation rejected");
 if (process.env.INCYS_TEST_ID_TOKEN) {
   const r = await fetch(base + "/api/v1/workspace", {
     headers: { Authorization: `Bearer ${process.env.INCYS_TEST_ID_TOKEN}` },
-    signal: AbortSignal.timeout(55000),
+    signal: AbortSignal.timeout(90000),
   });
   assert.equal(r.status, 200, "Authenticated workspace");
   const data = await r.json();
   assert.ok(data.user.id && Array.isArray(data.user.roles));
-  checks.push("Verified Firebase identity and scoped database workspace");
+  checks.push("Verified identity and scoped database workspace");
 }
 console.log(
   JSON.stringify(

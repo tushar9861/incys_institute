@@ -1,0 +1,44 @@
+# Free staging web service. Database/auth/storage live in a separate Supabase Free project.
+# No paid Render database, disk, background worker, or cron service is requested.
+services:
+  - type: web
+    name: incys-staging
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AUTH_MODE
+        value: supabase
+      - key: NEXT_PUBLIC_AUTH_MODE
+        value: supabase
+      - key: DEMO_MODE
+        value: "false"
+      - key: DATABASE_SCHEMA
+        value: incys
+      - key: STORAGE_PROVIDER
+        value: supabase
+      - key: SUPABASE_STORAGE_BUCKET
+        value: incys-private
+      - key: DOCUMENT_SCAN_MODE
+        value: deferred
+      - key: APP_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: WORKER_TOKEN
+        generateValue: true

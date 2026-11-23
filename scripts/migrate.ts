@@ -1,7 +1,11 @@
 import { readFile, readdir } from "node:fs/promises";
-import { pool } from "../server/db";
+import { pool, databaseSchema } from "../server/db";
 const db = await pool.connect();
 try {
+  if (databaseSchema !== "public") {
+    await db.query(`CREATE SCHEMA IF NOT EXISTS "${databaseSchema}"`);
+    await db.query(`REVOKE ALL ON SCHEMA "${databaseSchema}" FROM PUBLIC`);
+  }
   // Serialize manual and scheduled migration runs on one dedicated connection.
   await db.query(
     "SELECT pg_advisory_lock(hashtextextended('incys-schema-migrations',0))",

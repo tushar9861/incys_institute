@@ -8,6 +8,24 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as sb;
+
+class SecureSupabaseStorage extends sb.LocalStorage {
+  const SecureSupabaseStorage();
+  static const _storage = FlutterSecureStorage();
+  static const _key = 'incys_supabase_session';
+  @override
+  Future<void> initialize() async {}
+  @override
+  Future<bool> hasAccessToken() => _storage.containsKey(key: _key);
+  @override
+  Future<String?> accessToken() => _storage.read(key: _key);
+  @override
+  Future<void> removePersistedSession() => _storage.delete(key: _key);
+  @override
+  Future<void> persistSession(String persistSessionString) =>
+      _storage.write(key: _key, value: persistSessionString);
+}
 
 class InstituteApi {
   static const baseUrl = String.fromEnvironment(
@@ -15,14 +33,28 @@ class InstituteApi {
     defaultValue: 'http://10.0.2.2:3000',
   );
   static const firebaseKey = String.fromEnvironment('FIREBASE_API_KEY');
-  static bool get firebaseEnabled => firebaseKey.isNotEmpty;
+  static const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  static const supabaseKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
+  static bool get supabaseEnabled =>
+      supabaseUrl.isNotEmpty && supabaseKey.isNotEmpty;
+  static bool get firebaseEnabled => !supabaseEnabled && firebaseKey.isNotEmpty;
   final String endpoint;
   InstituteApi({this.endpoint = baseUrl});
   final storage = const FlutterSecureStorage();
   String? _token;
   StreamSubscription<String>? _pushRefresh;
   Future<Map<String, String>> _headers() async {
-    final token = firebaseEnabled
+    if (supabaseEnabled) {
+      final auth = sb.Supabase.instance.client.auth;
+      final expiry = auth.currentSession?.expiresAt;
+      if (expiry != null &&
+          expiry <= DateTime.now().millisecondsSinceEpoch ~/ 1000 + 60) {
+        await auth.refreshSession();
+      }
+    }
+    final token = supabaseEnabled
+        ? sb.Supabase.instance.client.auth.currentSession?.accessToken
+        : firebaseEnabled
         ? await FirebaseAuth.instance.currentUser?.getIdToken()
         : _token;
     return {if (token != null) 'Authorization': 'Bearer $token'};
@@ -76,7 +108,7 @@ class InstituteApi {
     final response = await request
         .send()
         .then(http.Response.fromStream)
-        .timeout(const Duration(seconds: 75));
+        .timeout(const Duration(seconds: 90));
     return Map<String, dynamic>.from(_decode(response));
   }
 
@@ -86,7 +118,7 @@ class InstituteApi {
           Uri.parse('$endpoint/api/v1/documents/${Uri.encodeComponent(id)}'),
           headers: await _headers(),
         )
-        .timeout(const Duration(seconds: 45));
+        .timeout(const Duration(seconds: 90));
     if (response.statusCode >= 400) _decode(response);
     return response.bodyBytes;
   }
@@ -95,7 +127,16 @@ class InstituteApi {
     if (kReleaseMode && Uri.parse(endpoint).scheme != 'https') {
       throw StateError('Release builds require an HTTPS API_BASE_URL.');
     }
-    if (firebaseEnabled) {
+    if (supabaseEnabled) {
+      await sb.Supabase.initialize(
+        url: supabaseUrl,
+        publishableKey: supabaseKey,
+        authOptions: const sb.FlutterAuthClientOptions(
+          localStorage: SecureSupabaseStorage(),
+          detectSessionInUri: false,
+        ),
+      );
+    } else if (firebaseEnabled) {
       await Firebase.initializeApp(
         options: const FirebaseOptions(
           apiKey: firebaseKey,
@@ -123,12 +164,17 @@ class InstituteApi {
     final response = await request
         .send()
         .then(http.Response.fromStream)
-        .timeout(const Duration(seconds: 25));
+        .timeout(const Duration(seconds: 90));
     return _decode(response);
   }
 
   Future<void> signIn(String email, String password) async {
-    if (firebaseEnabled) {
+    if (supabaseEnabled) {
+      await sb.Supabase.instance.client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+    } else if (firebaseEnabled) {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -172,7 +218,17 @@ class InstituteApi {
   }
 
   Future<void> register(String name, String email, String password) async {
-    if (firebaseEnabled) {
+    if (supabaseEnabled) {
+      await sb.Supabase.instance.client.auth.signUp(
+        email: email,
+        password: password,
+        data: {'name': name, 'account_consent': true},
+        emailRedirectTo: '$endpoint/login',
+      );
+      throw Exception(
+        'Verification email sent. Verify your email, then sign in.',
+      );
+    } else if (firebaseEnabled) {
       final credential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
       await credential.user?.updateDisplayName(name);
@@ -195,7 +251,11 @@ class InstituteApi {
   }
 
   Future<void> signOut() async {
-    if (firebaseEnabled) {
+    if (supabaseEnabled) {
+      await sb.Supabase.instance.client.auth.signOut(
+        scope: sb.SignOutScope.local,
+      );
+    } else if (firebaseEnabled) {
       try {
         final token = await storage.read(key: 'incys_push_token');
         if (token != null) {

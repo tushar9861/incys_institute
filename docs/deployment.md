@@ -2,7 +2,7 @@
 
 No infrastructure apply, live payment request or release publication has been performed. Use client-owned accounts and configure credentials through the deployment environment or Secret Manager, never in Git or chat.
 
-The user enabled Blaze and authorized full GCP deployment. See the [INCYS Firebase guide](firebase-deployment.md) for the current stack and automated deployment procedure.
+The current target is [Render Free and Supabase Free](free-staging.md) for ₹0 initial testing. GCP provisioning is paused because the linked billing account is closed. The [INCYS Firebase guide](firebase-deployment.md) remains the optional GCP deployment procedure once billing is restored.
 
 ## Local review
 

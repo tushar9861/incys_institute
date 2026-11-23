@@ -119,11 +119,15 @@ class _DocumentsPanelState extends State<DocumentsPanel> {
               contentPadding: EdgeInsets.zero,
               title: Text(d['filename']),
               subtitle: Text(
-                '${d['purpose'].replaceAll('_', ' ')} · ${(d['size_bytes'] / 1024).ceil()} KB',
+                '${d['purpose'].replaceAll('_', ' ')} · ${(d['size_bytes'] / 1024).ceil()} KB${d['state'] == 'clean'
+                    ? ''
+                    : d['state'] == 'quarantined'
+                    ? '\nAwaiting safety check'
+                    : '\nRejected by safety check'}',
               ),
               trailing: IconButton(
                 tooltip: 'Save ${d['filename']}',
-                onPressed: busy
+                onPressed: busy || d['state'] != 'clean'
                     ? null
                     : () => run(
                         () => saveDocument(widget.api, d['id'], d['filename']),

@@ -1,7 +1,10 @@
 "use client";
 import { initializeApp, getApps } from "firebase/app";
 import { firebaseConfig, firebaseEnabled } from "./firebase-config";
+import { supabaseEnabled } from "./auth-config";
+import { supabaseBrowser } from "./supabase-client";
 export { firebaseEnabled } from "./firebase-config";
+export { hostedAuthEnabled, supabaseEnabled } from "./auth-config";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -18,6 +21,13 @@ import {
   type TotpSecret,
 } from "firebase/auth";
 export async function authHeaders(): Promise<Record<string, string>> {
+  if (supabaseEnabled) {
+    const { data, error } = await supabaseBrowser().auth.getSession();
+    if (error) throw error;
+    return data.session
+      ? { Authorization: `Bearer ${data.session.access_token}` }
+      : {};
+  }
   if (!firebaseEnabled) return {};
   await auth().authStateReady();
   const token = await auth().currentUser?.getIdToken();
@@ -34,11 +44,7 @@ export async function api<T = any>(
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (firebaseEnabled) {
-    await auth().authStateReady();
-    const token = await auth().currentUser?.getIdToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
+  Object.assign(headers, await authHeaders());
   const response = await fetch(`/api/v1/${path}`, {
     method,
     headers,
@@ -55,6 +61,19 @@ export async function api<T = any>(
   return data;
 }
 export async function signIn(email: string, password: string) {
+  if (supabaseEnabled) {
+    const { error } = await supabaseBrowser().auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw error;
+    const { data, error: factorsError } =
+      await supabaseBrowser().auth.mfa.listFactors();
+    if (factorsError) throw factorsError;
+    if (data.totp.length)
+      throw new AuthenticatorChallenge(undefined, data.totp[0].id);
+    return { user: await api("me") };
+  }
   if (firebaseEnabled) {
     try {
       await signInWithEmailAndPassword(auth(), email, password);
@@ -70,6 +89,20 @@ export async function signIn(email: string, password: string) {
   return api("auth/login", "POST", { email, password });
 }
 export async function signUp(name: string, email: string, password: string) {
+  if (supabaseEnabled) {
+    const { error } = await supabaseBrowser().auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name, account_consent: true },
+        emailRedirectTo: `${window.location.origin}/login`,
+      },
+    });
+    if (error) throw error;
+    throw new Error(
+      "Verification email sent. Verify your email, then sign in.",
+    );
+  }
   if (firebaseEnabled) {
     const result = await createUserWithEmailAndPassword(
       auth(),
@@ -86,11 +119,17 @@ export async function signUp(name: string, email: string, password: string) {
   return signIn(email, password);
 }
 export async function logout() {
-  if (firebaseEnabled) await signOut(auth());
+  if (supabaseEnabled) {
+    const { error } = await supabaseBrowser().auth.signOut({ scope: "local" });
+    if (error) throw error;
+  } else if (firebaseEnabled) await signOut(auth());
   else await api("auth/logout", "POST", {});
 }
 export class AuthenticatorChallenge extends Error {
-  constructor(public resolver: MultiFactorResolver) {
+  constructor(
+    public resolver?: MultiFactorResolver,
+    public factorId?: string,
+  ) {
     super("Enter the code from your authenticator app.");
   }
 }
@@ -98,6 +137,15 @@ export async function confirmAuthenticator(
   challenge: AuthenticatorChallenge,
   code: string,
 ) {
+  if (challenge.factorId && supabaseEnabled) {
+    const { error } = await supabaseBrowser().auth.mfa.challengeAndVerify({
+      factorId: challenge.factorId,
+      code,
+    });
+    if (error) throw error;
+    return { user: await api("me") };
+  }
+  if (!challenge.resolver) throw new Error("Please sign in again.");
   const factor = challenge.resolver.hints.find(
     (h) => h.factorId === TotpMultiFactorGenerator.FACTOR_ID,
   );
@@ -110,32 +158,89 @@ export async function confirmAuthenticator(
   );
   return { user: await api("me") };
 }
-export async function startAuthenticatorSetup() {
+export type AuthenticatorSecret = {
+  secretKey: string;
+  generateQrCodeUrl: (email: string, issuer: string) => string;
+  firebase?: TotpSecret;
+  factorId?: string;
+};
+export async function startAuthenticatorSetup(): Promise<AuthenticatorSecret> {
+  if (supabaseEnabled) {
+    const client = supabaseBrowser();
+    const { data: current, error: listError } =
+      await client.auth.mfa.listFactors();
+    if (listError) throw listError;
+    for (const factor of current.all.filter(
+      (f) => f.status === "unverified" && f.factor_type === "totp",
+    )) {
+      const { error } = await client.auth.mfa.unenroll({ factorId: factor.id });
+      if (error) throw error;
+    }
+    const { data, error } = await client.auth.mfa.enroll({
+      factorType: "totp",
+      friendlyName: "INCYS authenticator",
+      issuer: "INCYS",
+    });
+    if (error) throw error;
+    return {
+      secretKey: data.totp.secret,
+      generateQrCodeUrl: () => data.totp.uri,
+      factorId: data.id,
+    };
+  }
   const user = auth().currentUser;
   if (!user?.emailVerified)
     throw new Error("Sign in with a verified email first.");
-  return TotpMultiFactorGenerator.generateSecret(
+  const secret = await TotpMultiFactorGenerator.generateSecret(
     await multiFactor(user).getSession(),
   );
+  return {
+    secretKey: secret.secretKey,
+    generateQrCodeUrl: (email, issuer) =>
+      secret.generateQrCodeUrl(email, issuer),
+    firebase: secret,
+  };
 }
 export async function finishAuthenticatorSetup(
-  secret: TotpSecret,
+  secret: AuthenticatorSecret,
   code: string,
 ) {
+  if (supabaseEnabled && secret.factorId) {
+    const { error } = await supabaseBrowser().auth.mfa.challengeAndVerify({
+      factorId: secret.factorId,
+      code,
+    });
+    if (error) throw error;
+    await logout();
+    return;
+  }
   const user = auth().currentUser;
   if (!user) throw new Error("Please sign in again.");
   await multiFactor(user).enroll(
-    TotpMultiFactorGenerator.assertionForEnrollment(secret, code),
+    TotpMultiFactorGenerator.assertionForEnrollment(secret.firebase!, code),
     "INCYS authenticator",
   );
   await signOut(auth());
 }
 export async function resetPassword(email: string) {
+  if (supabaseEnabled) {
+    const { error } = await supabaseBrowser().auth.resetPasswordForEmail(
+      email,
+      { redirectTo: `${window.location.origin}/login` },
+    );
+    if (error) throw error;
+    return;
+  }
   if (!firebaseEnabled)
     throw new Error(
       "Password reset requires the configured identity provider.",
     );
   await sendPasswordResetEmail(auth(), email);
+}
+export async function setRecoveredPassword(password: string) {
+  const { error } = await supabaseBrowser().auth.updateUser({ password });
+  if (error) throw error;
+  await logout();
 }
 export const money = (paise: number) =>
   new Intl.NumberFormat("en-IN", {

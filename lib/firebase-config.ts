@@ -1,11 +1,9 @@
 import registeredApp from "../config/firebase.web.json";
+import { authMode } from "./auth-config";
 
 // Firebase web configuration is public client metadata, not deployment authority.
 // Analytics is deliberately not initialized. Local demo development remains opt-in.
-export const firebaseEnabled =
-  process.env.NODE_ENV === "production" ||
-  process.env.NEXT_PUBLIC_AUTH_MODE === "firebase" ||
-  Boolean(process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
+export const firebaseEnabled = authMode === "firebase";
 export const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || registeredApp.apiKey,
   authDomain:

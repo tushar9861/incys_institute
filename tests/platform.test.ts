@@ -654,6 +654,53 @@ test("private files reject spoofed content and cross-user downloads", async () =
   assert.match(response.headers.get("content-disposition")!, /attachment/);
 });
 
+test("deferred uploads remain quarantined and unavailable to owners and staff", async () => {
+  const owner = await user(),
+    admin = await user("admin");
+  const session = await login(owner.email, "test-password-for-suite");
+  const prior = process.env.DOCUMENT_SCAN_MODE;
+  try {
+    process.env.DOCUMENT_SCAN_MODE = "deferred";
+    const form = new FormData();
+    form.set(
+      "file",
+      new File(["%PDF-1.4\nSynthetic quarantined file"], "pending.pdf", {
+        type: "application/pdf",
+      }),
+    );
+    form.set("purpose", "admission_document");
+    const doc = (await uploadDocument(
+      new Request("http://localhost/api/v1/documents", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.token}` },
+        body: form,
+      }),
+    ))!;
+    assert.equal(doc.state, "quarantined");
+    assert.ok(
+      (await workspace(owner)).documents.some(
+        (d: any) => d.id === doc.id && d.state === "quarantined",
+      ),
+    );
+    assert.ok(
+      !(await workspace(admin)).documents.some((d: any) => d.id === doc.id),
+    );
+    await assert.rejects(
+      () =>
+        downloadDocument(
+          new Request("http://localhost", {
+            headers: { Authorization: `Bearer ${session.token}` },
+          }),
+          doc.id,
+        ),
+      /not found/,
+    );
+  } finally {
+    if (prior === undefined) delete process.env.DOCUMENT_SCAN_MODE;
+    else process.env.DOCUMENT_SCAN_MODE = prior;
+  }
+});
+
 test("privacy decisions require an administrator and oversized API bodies are rejected", async () => {
   const owner = await user();
   const r = (await one(

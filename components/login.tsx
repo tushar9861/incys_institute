@@ -2,13 +2,16 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Leaf, ShieldCheck } from "lucide-react";
-import type { TotpSecret } from "firebase/auth";
+import { supabaseBrowser } from "@/lib/supabase-client";
 import {
   api,
   signIn,
   signUp,
   preferredRole,
-  firebaseEnabled,
+  hostedAuthEnabled,
+  supabaseEnabled,
+  setRecoveredPassword,
+  type AuthenticatorSecret,
   AuthenticatorChallenge,
   confirmAuthenticator,
   startAuthenticatorSetup,
@@ -24,13 +27,20 @@ export function Login() {
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
     [challenge, setChallenge] = useState<AuthenticatorChallenge | null>(null),
-    [secret, setSecret] = useState<TotpSecret | null>(null),
+    [secret, setSecret] = useState<AuthenticatorSecret | null>(null),
+    [recovery, setRecovery] = useState(false),
     [qr, setQr] = useState(""),
     [code, setCode] = useState("");
   useEffect(() => {
     api("config")
       .then((c) => setDemo(c.demo))
       .catch(() => {});
+    if (supabaseEnabled) {
+      const { data } = supabaseBrowser().auth.onAuthStateChange((event) => {
+        if (event === "PASSWORD_RECOVERY") setRecovery(true);
+      });
+      return () => data.subscription.unsubscribe();
+    }
   }, []);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -38,6 +48,13 @@ export function Login() {
     setError("");
     const f = new FormData(e.currentTarget);
     try {
+      if (recovery) {
+        await setRecoveredPassword(password);
+        setRecovery(false);
+        setPassword("");
+        setNotice("Password updated. Sign in with your new password.");
+        return;
+      }
       if (secret) {
         await finishAuthenticatorSetup(secret, code);
         setSecret(null);
@@ -107,13 +124,15 @@ export function Login() {
           Back to institute
         </Link>
         <h2>
-          {secret
-            ? "Set up your authenticator"
-            : challenge
-              ? "Verify your sign-in"
-              : signup
-                ? "Create your account"
-                : "Welcome back"}
+          {recovery
+            ? "Choose a new password"
+            : secret
+              ? "Set up your authenticator"
+              : challenge
+                ? "Verify your sign-in"
+                : signup
+                  ? "Create your account"
+                  : "Welcome back"}
         </h2>
         <p className="muted">
           {secret
@@ -139,7 +158,20 @@ export function Login() {
               </p>
             </>
           )}
-          {secret || challenge ? (
+          {recovery ? (
+            <label>
+              New password
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={12}
+                maxLength={128}
+                autoComplete="new-password"
+                required
+              />
+            </label>
+          ) : secret || challenge ? (
             <label>
               Authenticator code
               <input
@@ -207,16 +239,18 @@ export function Login() {
           <button className="button" disabled={busy}>
             {busy
               ? "Please wait…"
-              : secret
-                ? "Enable authenticator"
-                : challenge
-                  ? "Verify code"
-                  : signup
-                    ? "Create account"
-                    : "Sign in"}
+              : recovery
+                ? "Update password"
+                : secret
+                  ? "Enable authenticator"
+                  : challenge
+                    ? "Verify code"
+                    : signup
+                      ? "Create account"
+                      : "Sign in"}
           </button>
         </form>
-        {firebaseEnabled &&
+        {hostedAuthEnabled &&
           error.includes("Multi-factor authentication is required") && (
             <button
               className="button secondary"
@@ -226,7 +260,7 @@ export function Login() {
               Set up authenticator
             </button>
           )}
-        {!secret && !challenge && (
+        {!secret && !challenge && !recovery && (
           <>
             <button
               className="text-link"
@@ -239,7 +273,7 @@ export function Login() {
                 ? "Already registered? Sign in"
                 : "New here? Create an account"}
             </button>
-            {firebaseEnabled && !signup && (
+            {hostedAuthEnabled && !signup && (
               <button
                 className="text-link"
                 onClick={async () => {

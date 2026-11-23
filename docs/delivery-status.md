@@ -43,10 +43,12 @@ This is a substantial development release, **not every feature in the PDFs compl
 
 ## Current deployment
 
+The current target is **Render Free + Supabase Free**, following the owner's ₹0 initial-testing requirement. Provider adapters, private database permissions/RLS, Supabase identity and revocation checks, document quarantine, an operator-run scanner and a secret-protected job endpoint are implemented. The Render configuration requests only one free web service. New provider-account access and repository write access are pending; no Supabase project or Render service has been created. Hosted identity/storage acceptance and an automatic job schedule have not been completed. See [free staging](free-staging.md).
+
 The user enabled Blaze on 23 November 2026 and authorized the full backend architecture. Deployment authentication succeeded, required APIs were enabled and the Android Firebase app was registered. Deployment is blocked: Google Storage rejects the first state-bucket creation with “disabled in state delinquent,” and the linked “Firebase Payment” account reports `open: false`. Project-level `billingEnabled: true` does not override that account restriction. No Cloud Run service, SQL database, private bucket or Hosting release has been created. Firebase Hosting, Cloud Run, Cloud SQL, private storage, a private malware scanner and scheduled jobs are configured for retry once the linked account is active. See [Firebase deployment](firebase-deployment.md).
 
 ## Inputs needed to finish launch
 
-Client-approved final scope and acceptance owners; approved branding and programme/service/product content; Active linked Cloud Billing account; first institute administrator email; Firebase/Identity Platform acceptance; Razorpay test/live setup; video provider choice; scanner/storage connectivity; refund/shipping/tax/retention policies; signed Android publishing configuration; and repository write access. Supply secrets through the relevant account/environment, not in the repository.
+Client-approved final scope and acceptance owners; approved branding and programme/service/product content; selected free hosting accounts (or restored billing for a later GCP rollout); first institute administrator email; hosted identity/MFA and mail-sender acceptance; Razorpay test/live setup; video provider choice; scanner/storage connectivity; refund/shipping/tax/retention policies; signed Android publishing configuration; and repository write access. Supply secrets through the relevant account/environment, not in the repository.
 
 For the concrete results, see [the validation record](validation.md).

@@ -1,5 +1,9 @@
 # Architecture and decisions
 
+## Free staging option
+
+For the current ₹0 testing target, Render Free runs the website/API, while Supabase Free provides PostgreSQL, Auth and private Storage. Google Cloud is paused. Business data stays in an unexposed `incys` schema with a restricted server role and RLS; the API validates JWT signatures, verified email, active sessions and MFA before applying domain authorization. Uploads remain quarantined until an operator runs ClamAV. In-app jobs can run from the operator CLI or a secret-protected scheduler endpoint; no hosted schedule is provisioned yet. See [free staging](free-staging.md) for configuration and limitations. The GCP diagram below remains the optional later deployment.
+
 ## Application boundary
 
 The initial implementation uses Next.js 16 / React 19 for the public website and role workspaces. Next Route Handlers expose `/api/v1`; domain logic lives in independent TypeScript modules under `server/`. Flutter uses the same API. PostgreSQL is the system of record.

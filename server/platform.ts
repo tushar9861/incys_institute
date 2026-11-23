@@ -58,10 +58,10 @@ export async function workspace(user: User) {
   data.documents = await rows(
     `SELECT d.id,d.owner_id,d.filename,d.mime_type,d.size_bytes,d.purpose,d.state,d.created_at,u.name AS owner_name
     FROM documents d JOIN users u ON u.id=d.owner_id
-    WHERE d.state='clean' AND (d.owner_id=$1
-      OR ($2 AND d.purpose='admission_document')
+    WHERE (d.owner_id=$1 AND d.state<>'deleted') OR (d.state='clean' AND (
+      ($2 AND d.purpose='admission_document')
       OR ($3 AND d.purpose='patient_report' AND EXISTS(SELECT 1 FROM appointments a WHERE a.patient_id=d.owner_id AND a.practitioner_id=$1 AND a.status IN ('confirmed','completed')))
-      OR (d.purpose='assignment_attachment' AND EXISTS(SELECT 1 FROM submissions s JOIN assignments a ON a.id=s.assignment_id JOIN cohorts h ON h.id=a.cohort_id WHERE s.document_id=d.id AND ($2 OR ($4 AND h.trainer_id=$1)))))
+      OR (d.purpose='assignment_attachment' AND EXISTS(SELECT 1 FROM submissions s JOIN assignments a ON a.id=s.assignment_id JOIN cohorts h ON h.id=a.cohort_id WHERE s.document_id=d.id AND ($2 OR ($4 AND h.trainer_id=$1))))))
     ORDER BY d.created_at DESC LIMIT 200`,
     [user.id, has(user, "admin"), has(user, "clinician"), has(user, "trainer")],
   );

@@ -8,6 +8,7 @@ import { getApps, initializeApp, applicationDefault } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { one, pool, transaction, audit } from "./db";
 import { requireThat, AppError } from "./errors";
+import { authenticateSupabase } from "./supabase-auth";
 export type User = {
   id: string;
   name: string;
@@ -95,6 +96,10 @@ export async function authenticate(request: Request): Promise<User> {
     .map((c) => c.trim())
     .find((c) => c.startsWith("incys_session="))
     ?.slice(14);
+  if (process.env.AUTH_MODE === "supabase") {
+    requireThat(bearer, 401, "Please sign in.");
+    return safeUser(await authenticateSupabase(bearer));
+  }
   if (process.env.AUTH_MODE === "firebase") {
     requireThat(bearer, 401, "Please sign in.");
     if (!getApps().length)

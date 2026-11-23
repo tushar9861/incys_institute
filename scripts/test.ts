@@ -45,4 +45,5 @@ await run([
   "--test-concurrency=1",
   "tests/platform.test.ts",
   "tests/deployment.test.ts",
+  "tests/supabase.test.ts",
 ]);

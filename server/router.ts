@@ -18,6 +18,8 @@ import * as assessments from "./assessments";
 import * as refunds from "./refunds";
 import { boundedBody } from "./request-body";
 import { allowedOrigin } from "./origin";
+import { authorizedWorkerRequest } from "./job-auth";
+import { runWorker } from "./worker";
 function json(
   data: unknown,
   status = 200,
@@ -79,6 +81,14 @@ export async function route(request: Request, path: string[]) {
       });
     if (key === "catalog" && method === "GET")
       return json(await platform.catalog());
+    if (key === "internal/worker" && method === "POST") {
+      requireThat(
+        authorizedWorkerRequest(request),
+        401,
+        "Invalid job credentials.",
+      );
+      return json(await runWorker());
+    }
     if (key === "auth/login" && method === "POST") {
       const d = z
         .object({

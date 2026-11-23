@@ -5,10 +5,12 @@ if (!migration || !runtime)
   throw new Error("Migration and runtime database URLs are required.");
 const target = new URL(runtime),
   owner = new URL(migration),
-  role = decodeURIComponent(target.username);
+  role = decodeURIComponent(target.username).split(".")[0],
+  schema = process.env.DATABASE_SCHEMA || "public";
 if (
   !/^incys_[a-z0-9_]+$/.test(role) ||
-  role === decodeURIComponent(owner.username) ||
+  !/^[a-z][a-z0-9_]*$/.test(schema) ||
+  role === decodeURIComponent(owner.username).split(".")[0] ||
   target.pathname !== owner.pathname
 )
   throw new Error(
@@ -48,21 +50,69 @@ try {
   ).rows[0].ddl;
   await db.query(ddl);
   const identifier = quote(role);
-  await db.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC`);
+  const namespace = quote(schema);
+  await db.query(`REVOKE CREATE ON SCHEMA ${namespace} FROM PUBLIC`);
   await db.query(
     `GRANT CONNECT ON DATABASE ${quote(decodeURIComponent(target.pathname.slice(1)))} TO ${identifier}`,
   );
-  await db.query(`GRANT USAGE ON SCHEMA public TO ${identifier}`);
+  await db.query(`GRANT USAGE ON SCHEMA ${namespace} TO ${identifier}`);
   await db.query(
-    `GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO ${identifier}`,
+    `GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA ${namespace} TO ${identifier}`,
   );
   await db.query(
-    `GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO ${identifier}`,
+    `GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA ${namespace} TO ${identifier}`,
   );
-  await db.query(`REVOKE ALL ON TABLE schema_migrations FROM ${identifier}`);
   await db.query(
-    `REVOKE UPDATE,DELETE ON TABLE clinical_notes,audit_events,ledger_entries FROM ${identifier}`,
+    `REVOKE ALL ON TABLE ${namespace}.schema_migrations FROM ${identifier}`,
   );
+  await db.query(
+    `REVOKE UPDATE,DELETE ON TABLE ${namespace}.clinical_notes,${namespace}.audit_events,${namespace}.ledger_entries FROM ${identifier}`,
+  );
+  if (process.env.AUTH_MODE === "supabase") {
+    if (schema !== "incys")
+      throw new Error(
+        "Supabase application data requires the private incys schema.",
+      );
+    // Defense in depth if this private schema is accidentally added to the Data API.
+    // The trusted API role still applies per-user authorization in server handlers.
+    const tables = (
+      await db.query("SELECT tablename FROM pg_tables WHERE schemaname=$1", [
+        schema,
+      ])
+    ).rows;
+    for (const { tablename } of tables) {
+      const table = `${namespace}.${quote(tablename)}`;
+      await db.query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
+      await db.query(`DROP POLICY IF EXISTS incys_server_access ON ${table}`);
+      await db.query(
+        `CREATE POLICY incys_server_access ON ${table} TO ${identifier} USING (true) WITH CHECK (true)`,
+      );
+    }
+    await db.query(`CREATE OR REPLACE FUNCTION ${namespace}.is_supabase_session_active(identity_uid uuid, session_uid uuid)
+      RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+      SELECT EXISTS(SELECT 1 FROM auth.sessions s WHERE s.id=session_uid AND s.user_id=identity_uid AND (s.not_after IS NULL OR s.not_after>now()))
+      $$`);
+    await db.query(
+      `REVOKE ALL ON FUNCTION ${namespace}.is_supabase_session_active(uuid,uuid) FROM PUBLIC`,
+    );
+    await db.query(
+      `GRANT EXECUTE ON FUNCTION ${namespace}.is_supabase_session_active(uuid,uuid) TO ${identifier}`,
+    );
+    for (const restricted of ["anon", "authenticated", "service_role"]) {
+      await db.query(
+        `REVOKE ALL ON SCHEMA ${namespace} FROM ${quote(restricted)}`,
+      );
+      await db.query(
+        `REVOKE ALL ON ALL TABLES IN SCHEMA ${namespace} FROM ${quote(restricted)}`,
+      );
+      await db.query(
+        `REVOKE ALL ON ALL FUNCTIONS IN SCHEMA ${namespace} FROM ${quote(restricted)}`,
+      );
+      await db.query(
+        `ALTER DEFAULT PRIVILEGES IN SCHEMA ${namespace} REVOKE ALL ON TABLES FROM ${quote(restricted)}`,
+      );
+    }
+  }
   console.log(
     "Runtime database role provisioned with data access only; migration metadata and immutable history protected.",
   );

@@ -1,23 +1,17 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile, readFile, unlink } from "node:fs/promises";
 import path from "node:path";
-import { getApps, initializeApp, applicationDefault } from "firebase-admin/app";
-import { getStorage } from "firebase-admin/storage";
-import { one, rows, pool, transaction, audit } from "./db";
-import { authenticate, has, isDemo, throttle, type User } from "./auth";
-import { AppError, requireThat } from "./errors";
+import { one, transaction, audit } from "./db";
+import { authenticate, has, throttle } from "./auth";
+import { requireThat } from "./errors";
 import { boundedBody } from "./request-body";
 import { allowedOrigin } from "./origin";
 import { scanDocument } from "./scan";
+import {
+  storePrivateFile,
+  readPrivateFile,
+  deletePrivateFile,
+} from "./private-storage";
 const allowed = ["application/pdf", "image/jpeg", "image/png"];
-function storage() {
-  if (!getApps().length)
-    initializeApp({
-      credential: applicationDefault(),
-      projectId: process.env.FIREBASE_PROJECT_ID,
-    });
-  return getStorage().bucket(process.env.GCS_PRIVATE_BUCKET);
-}
 function signatureMatches(bytes: Buffer, mime: string) {
   return mime === "application/pdf"
     ? bytes.subarray(0, 5).toString() === "%PDF-"
@@ -76,26 +70,15 @@ export async function uploadDocument(request: Request) {
     "The file content does not match its declared format.",
   );
   await throttle(`document-upload:${user.id}`, 20, 3600);
-  await scanDocument(bytes);
+  const deferred = process.env.DOCUMENT_SCAN_MODE === "deferred";
+  if (!deferred) await scanDocument(bytes);
+  const state = deferred ? "quarantined" : "clean";
   const key = `documents/${user.id}/${randomUUID()}`;
-  if (process.env.GCS_PRIVATE_BUCKET)
-    await storage()
-      .file(key)
-      .save(bytes, {
-        contentType: file.type,
-        resumable: false,
-        metadata: { cacheControl: "private, no-store" },
-      });
-  else {
-    requireThat(isDemo(), 503, "Private file storage is not configured.");
-    const dest = path.join(process.cwd(), "uploads", key);
-    await mkdir(path.dirname(dest), { recursive: true });
-    await writeFile(dest, bytes, { flag: "wx" });
-  }
+  await storePrivateFile(key, bytes, file.type);
   try {
     return await transaction(async (db) => {
       const record = await one(
-        "INSERT INTO documents(owner_id,filename,mime_type,size_bytes,storage_key,purpose,state) VALUES($1,$2,$3,$4,$5,$6,'clean') RETURNING id,filename,mime_type,size_bytes,purpose,state,created_at",
+        "INSERT INTO documents(owner_id,filename,mime_type,size_bytes,storage_key,purpose,state) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,filename,mime_type,size_bytes,purpose,state,created_at",
         [
           user.id,
           path
@@ -106,17 +89,20 @@ export async function uploadDocument(request: Request) {
           file.size,
           key,
           purpose,
+          state,
         ],
         db,
       );
-      await audit(db, user.id, "document.uploaded", record!.id, { purpose });
+      await audit(db, user.id, "document.uploaded", record!.id, {
+        purpose,
+        state,
+      });
       return record;
     });
   } catch (error) {
     // Do not leave an untracked private object after a failed database write.
     try {
-      if (process.env.GCS_PRIVATE_BUCKET) await storage().file(key).delete();
-      else await unlink(path.join(process.cwd(), "uploads", key));
+      await deletePrivateFile(key);
     } catch {
       console.error(
         "Private document cleanup failed; storage reconciliation is required.",
@@ -149,15 +135,7 @@ export async function downloadDocument(request: Request, id: string) {
       ),
     );
   requireThat(permitted, 403, "You cannot access this document.");
-  let bytes: Buffer;
-  if (process.env.GCS_PRIVATE_BUCKET)
-    [bytes] = await storage().file(doc.storage_key).download();
-  else {
-    requireThat(isDemo(), 503, "Storage is unavailable.");
-    bytes = await readFile(
-      path.join(process.cwd(), "uploads", doc.storage_key),
-    );
-  }
+  const bytes = await readPrivateFile(doc.storage_key);
   await transaction((db) => audit(db, user.id, "document.downloaded", id));
   return new Response(new Uint8Array(bytes), {
     headers: {

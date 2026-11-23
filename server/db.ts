@@ -1,5 +1,8 @@
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 const globalDb = globalThis as unknown as { incysPool?: Pool };
+export const databaseSchema = process.env.DATABASE_SCHEMA || "public";
+if (!/^[a-z][a-z0-9_]*$/.test(databaseSchema))
+  throw new Error("Invalid database schema.");
 export const pool =
   globalDb.incysPool ??
   new Pool({
@@ -8,6 +11,11 @@ export const pool =
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 10000,
     application_name: "incys-platform",
+    onConnect: async (client) => {
+      await client.query("SELECT set_config('search_path',$1,false)", [
+        `${databaseSchema},extensions,public`,
+      ]);
+    },
   });
 globalDb.incysPool = pool;
 export type DB = Pick<PoolClient, "query">;
@@ -43,7 +51,7 @@ export async function transaction<T>(
 }
 export async function audit(
   db: DB,
-  actor: string,
+  actor: string | null,
   action: string,
   resourceId: string,
   details: object = {},

@@ -2,7 +2,7 @@
 
 An implemented development release for the Institute of Nature Cure & Yogic Science, Balasore. It includes a public website, role-based web workspaces, a shared PostgreSQL API, a Flutter Android client, and GCP infrastructure definitions. Advertising and marketing automation are excluded.
 
-**Status:** suitable for local functional review with synthetic data. This is not a completed production rollout. Provider integration tests, browser/device acceptance, approved client content and the remaining scope in [delivery status](docs/delivery-status.md) are required before launch. Required cloud APIs are enabled and the Android Firebase app is registered, but backend/database provisioning and Hosting publication are blocked by the linked closed billing account. No real payments have been collected.
+**Status:** suitable for local functional review with synthetic data. The current deployment target is **Render Free + Supabase Free** for initial ₹0 testing; see [free staging](docs/free-staging.md). Hosting-account and repository write access are pending. GCP is paused because its linked billing account is closed. Provider integration tests, device acceptance, approved content and the remaining scope in [delivery status](docs/delivery-status.md) are required before launch. No real payments have been collected.
 
 ## Run locally
 
@@ -32,9 +32,9 @@ The local password is `local-demo-only-change-me`. Accounts are:
 | `finance@demo.incys.local`   | Payments, refunds and fee visibility                          |
 | `admin@demo.incys.local`     | Admissions, approvals, access, content, finance and audit     |
 
-The seed script refuses to run in production. Local passwords, synthetic payment capture and filesystem uploads are disabled when `NODE_ENV=production`. `npm run build && npm start` therefore requires configured Firebase authentication for sign-in; use `npm run dev` for the synthetic demonstration.
+The seed script refuses to run in production. Local passwords, synthetic payment capture and filesystem uploads are disabled when `NODE_ENV=production`. `npm run build && npm start` therefore requires configured Firebase or Supabase authentication for sign-in; use `npm run dev` for the synthetic demonstration.
 
-Run `npm run worker` to deliver pending in-app notifications and expire eligible unpaid stock reservations. Production uses the scheduled Cloud Run job. Cloud SQL continues to incur charges even when Cloud Run scales to zero.
+Run `npm run worker` to deliver pending in-app notifications and expire eligible unpaid stock reservations. Free staging uses an operator-run job until a trusted scheduler is configured. The optional GCP architecture uses a scheduled Cloud Run job and paid Cloud SQL.
 
 ## What works in this release
 
@@ -42,7 +42,7 @@ Run `npm run worker` to deliver pending in-app notifications and expire eligible
 - Course applications, admissions approval, versioned curricula, cohorts, lessons, live class links, attendance, assignment submissions with protected attachments/grading, timed server-graded quizzes, completion eligibility, printable certificates and QR verification.
 - Vendor onboarding and product approval, stock reservation, checkout, fulfilment, 5% default commission snapshots and a balanced ledger. Full refund requests require an approver other than the requester. Late captures are preserved for reconciliation.
 - Operational enquiries, support responses, audience-specific announcements, privacy request review, private document uploads/downloads and an audit log.
-- Firebase authentication integration, staff/vendor TOTP enrollment and sign-in, verified email, password reset, server-side role checks, bounded request bodies and webhook signature verification.
+- Firebase or Supabase authentication integration, staff/vendor TOTP enrollment and sign-in, verified email, password reset, server-side role checks, bounded request bodies and webhook signature verification.
 
 The production adapters are implemented but need testing against client-owned Firebase, Razorpay, GCS and scanning services. Meeting URLs open an external provider; automated room provisioning and short-lived participant tokens are not yet implemented.
 
@@ -66,7 +66,7 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
 
 `10.0.2.2` reaches the host from an Android emulator. For a physical development device, use a reachable host on the same network and keep the development database private. The native client is for patients and students; staff and vendors use the responsive web workspaces.
 
-Production builds require an HTTPS API URL and Firebase Dart defines listed in [deployment](docs/deployment.md). The Android application ID `institute.incys.incys_mobile` is registered in Firebase. Use `flutter build apk --debug --dart-define-from-file=config/live.json` for a build targeting the intended live API; that API is not yet deployed. Configure a client-owned upload key using `mobile/android/key.properties.example`; the real key and properties file are ignored by Git. Release builds do not silently use the debug signing key.
+Production builds require an HTTPS API URL and the selected provider's public Dart defines in [free staging](docs/free-staging.md) or [deployment](docs/deployment.md). The Android application ID `institute.incys.incys_mobile` is registered in Firebase. `mobile/config/live.json` still targets the undeployed Firebase endpoint; create a new Supabase configuration after its actual URL exists. Configure a client-owned upload key using `mobile/android/key.properties.example`; the real key and properties file are ignored by Git. Release builds do not silently use the debug signing key.
 
 ## Validate
 
