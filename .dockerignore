@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.env*
+mobile
+attachments
+*.zip
+*.tsbuildinfo
+uploads
+infra/gcp/.terraform
+*.tfstate*
+*.tfvars
+*.tfplan
+*.jks
+*.keystore
+key.properties

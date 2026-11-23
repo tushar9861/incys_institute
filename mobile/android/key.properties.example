@@ -1,0 +1,4 @@
+storeFile=/absolute/path/to/client-upload-key.jks
+storePassword=SET_LOCALLY
+keyAlias=incys-upload
+keyPassword=SET_LOCALLY
