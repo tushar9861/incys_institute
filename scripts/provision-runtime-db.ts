@@ -66,7 +66,7 @@ try {
     `REVOKE ALL ON TABLE ${namespace}.schema_migrations FROM ${identifier}`,
   );
   await db.query(
-    `REVOKE UPDATE,DELETE ON TABLE ${namespace}.clinical_notes,${namespace}.audit_events,${namespace}.ledger_entries FROM ${identifier}`,
+    `REVOKE UPDATE,DELETE ON TABLE ${namespace}.clinical_notes,${namespace}.audit_events,${namespace}.ledger_entries,${namespace}.stock_movements,${namespace}.supply_documents,${namespace}.supplier_payments,${namespace}.shop_invoices FROM ${identifier}`,
   );
   if (process.env.AUTH_MODE === "supabase") {
     if (schema !== "incys")

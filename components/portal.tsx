@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BottomNav, type Destination } from "./app-navigation";
 import { BookingSheet } from "./booking-sheet";
+import { MotionEmblem } from "./motion-emblem";
 import { WellnessArt } from "./wellness-art";
 import {
   Leaf,
@@ -32,26 +33,17 @@ import {
   Smartphone,
 } from "lucide-react";
 import { api, money, date, logout, preferredRole } from "@/lib/client";
+import { FormModal, type Field, type Modal } from "./form-modal";
+import { ShopConsole, SupplierBottomNav } from "./shop-console";
+import { InvoiceButton } from "./invoice-view";
+import { states } from "@/lib/india";
 import { QuizComposer } from "./quiz-composer";
 import { Documents, DocumentDownload } from "./documents";
-type Field = {
-  name: string;
-  label: string;
-  type?: string;
-  options?: { value: string; label: string }[];
-  value?: any;
-  required?: boolean;
-  min?: number;
-  max?: number;
-};
-type Modal = {
-  title: string;
-  fields: Field[];
-  submit: (v: any) => Promise<unknown>;
-  label?: string;
-};
 const icons: Record<string, any> = {
   account: UserRound,
+  shopdesk: ShoppingBag,
+  supplies: Package,
+  settings: Settings,
   overview: LayoutDashboard,
   appointments: CalendarDays,
   plans: HeartPulse,
@@ -73,6 +65,7 @@ const icons: Record<string, any> = {
 const menus: Record<string, string[]> = {
   admin: [
     "overview",
+    "shopdesk",
     "appointments",
     "admissions",
     "teaching",
@@ -88,7 +81,7 @@ const menus: Record<string, string[]> = {
   ],
   clinician: ["overview", "appointments", "plans", "support"],
   reception: ["overview", "appointments", "enquiries", "support"],
-  finance: ["overview", "finance", "admissions", "support"],
+  finance: ["overview", "shopdesk", "finance", "admissions", "support"],
   patient: [
     "overview",
     "learning",
@@ -115,13 +108,18 @@ const menus: Record<string, string[]> = {
     "overview",
     "inventory",
     "orders",
+    "supplies",
     "finance",
+    "settings",
     "support",
     "notifications",
   ],
 };
 const names: Record<string, string> = {
   account: "Account",
+  shopdesk: "Shop management",
+  supplies: "Supplies & returns",
+  settings: "Business details",
   overview: "Overview",
   appointments: "Appointments",
   plans: "Care plans",
@@ -196,181 +194,7 @@ function DataTable({
     <div className="empty">
       <ClipboardList size={30} />
       <h3>{empty}</h3>
-      <p>New activity will appear here as it happens.</p>
     </div>
-  );
-}
-function FormModal({
-  modal,
-  close,
-  done,
-}: {
-  modal: Modal;
-  close: () => void;
-  done: () => void;
-}) {
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const d = dialog.current!;
-    const trigger = document.activeElement as HTMLElement | null;
-    d.showModal();
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      d.close();
-      document.body.style.overflow = previous;
-      trigger?.focus();
-    };
-  }, []);
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget),
-      v: Record<string, any> = {};
-    for (const field of modal.fields) {
-      const raw = f.get(field.name);
-      if (field.type === "checkbox") v[field.name] = raw === "on";
-      else if (field.type === "roles") v[field.name] = f.getAll(field.name);
-      else if (raw !== "" && raw != null)
-        v[field.name] =
-          field.type === "money"
-            ? Math.round(Number(raw) * 100)
-            : field.type === "number"
-              ? Number(raw)
-              : field.type === "datetime-local"
-                ? new Date(String(raw)).toISOString()
-                : raw;
-    }
-    setBusy(true);
-    try {
-      await modal.submit(v);
-      done();
-      close();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <dialog
-      ref={dialog}
-      className="modal-backdrop native-dialog"
-      aria-labelledby="modal-title"
-      onCancel={(e) => {
-        if (busy) e.preventDefault();
-        else close();
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !busy) close();
-      }}
-    >
-      <section className="modal">
-        <div className="modal-heading">
-          <h2 id="modal-title">{modal.title}</h2>
-          <button
-            className="icon-button"
-            onClick={close}
-            disabled={busy}
-            aria-label="Close"
-          >
-            <X />
-          </button>
-        </div>
-        <form onSubmit={submit}>
-          <div className="form-grid">
-            {modal.fields.map((f) => (
-              <label
-                className={
-                  ["textarea", "checkbox", "roles"].includes(f.type || "")
-                    ? "span-two"
-                    : ""
-                }
-                key={f.name}
-              >
-                {f.type !== "checkbox" && f.label}
-                {f.type === "select" ? (
-                  <select
-                    name={f.name}
-                    defaultValue={f.value || ""}
-                    required={f.required !== false}
-                  >
-                    <option value="" disabled>
-                      Select an option
-                    </option>
-                    {f.options?.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : f.type === "textarea" ? (
-                  <textarea
-                    name={f.name}
-                    defaultValue={f.value}
-                    rows={4}
-                    required={f.required !== false}
-                  />
-                ) : f.type === "checkbox" ? (
-                  <span className="check">
-                    <input
-                      name={f.name}
-                      type="checkbox"
-                      defaultChecked={f.value}
-                      required={f.required === true}
-                    />
-                    {f.label}
-                  </span>
-                ) : f.type === "roles" ? (
-                  <div className="chips">
-                    {f.options?.map((o) => (
-                      <label className="check" key={o.value}>
-                        <input
-                          type="checkbox"
-                          name={f.name}
-                          value={o.value}
-                          defaultChecked={f.value?.includes(o.value)}
-                        />
-                        {o.label}
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  <input
-                    name={f.name}
-                    type={f.type === "money" ? "number" : f.type || "text"}
-                    defaultValue={f.value}
-                    min={f.min ?? (f.type === "money" ? 0 : undefined)}
-                    max={f.max}
-                    step={f.type === "money" ? "0.01" : undefined}
-                    required={f.required !== false}
-                  />
-                )}
-              </label>
-            ))}
-          </div>
-          {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
-          )}
-          <div className="modal-actions">
-            <button
-              type="button"
-              className="button secondary"
-              onClick={close}
-              disabled={busy}
-            >
-              Cancel
-            </button>
-            <button className="button" disabled={busy}>
-              {busy ? "Saving…" : modal.label || "Save changes"}
-            </button>
-          </div>
-        </form>
-      </section>
-    </dialog>
   );
 }
 export function Portal({ role }: { role: string }) {
@@ -424,6 +248,18 @@ export function Portal({ role }: { role: string }) {
     trainer = role === "trainer",
     clinician = role === "clinician",
     vendor = role === "vendor";
+  const shopView =
+    (vendor &&
+      [
+        "overview",
+        "inventory",
+        "orders",
+        "supplies",
+        "finance",
+        "settings",
+      ].includes(tab)) ||
+    (["admin", "finance"].includes(role) &&
+      ["shopdesk", "inventory", "orders", "vendors"].includes(tab));
   async function refresh() {
     try {
       const [d, c, config] = await Promise.all([
@@ -873,29 +709,16 @@ export function Portal({ role }: { role: string }) {
         <main className="workspace-content">
           <div className="page-heading" key={tab}>
             <div>
-              <p className="eyebrow">
-                {tab === "overview"
-                  ? "YOUR INSTITUTE, CONNECTED"
-                  : "INCYS WORKSPACE"}
-              </p>
               <h1>
                 {tab === "overview"
                   ? `Welcome, ${data.user.name.split(" ")[0]}.`
                   : names[tab]}
               </h1>
-              <p className="muted">
-                {tab === "overview"
-                  ? "Here’s what’s happening across your workspace."
-                  : "Manage your records and keep every next step in view."}
-              </p>
             </div>
             <div className="button-row">
               {["patient", "student"].includes(role) &&
                 tab === "appointments" &&
                 button("Book appointment", book, "")}
-              {tab === "inventory" &&
-                vendor &&
-                button("Add product", newProduct, "")}
               {tab === "teaching" && button("Schedule class", newClass, "")}
               {tab === "support" &&
                 button(
@@ -933,7 +756,7 @@ export function Portal({ role }: { role: string }) {
               </button>
             </div>
           )}
-          {tab !== "overview" && tab !== "account" && !detail && (
+          {tab !== "overview" && tab !== "account" && !detail && !shopView && (
             <div className="search-box">
               <Search size={17} />
               <input
@@ -1068,7 +891,19 @@ export function Portal({ role }: { role: string }) {
               </button>
             </section>
           )}
-          {tab === "overview" && (
+          {shopView && (
+            <ShopConsole
+              role={role}
+              initialTab={
+                tab === "shopdesk"
+                  ? "overview"
+                  : tab === "vendors"
+                    ? "settings"
+                    : tab
+              }
+            />
+          )}
+          {tab === "overview" && !shopView && (
             <>
               {consumer && (
                 <div className="workspace-hero">
@@ -1086,7 +921,11 @@ export function Portal({ role }: { role: string }) {
                         Book care
                       </button>
                     </div>
-                    <WellnessArt />
+                    {admin || role === "finance" ? (
+                      <MotionEmblem variant="growth" />
+                    ) : (
+                      <WellnessArt />
+                    )}
                   </section>
                 </div>
               )}
@@ -2159,6 +1998,19 @@ export function Portal({ role }: { role: string }) {
                               },
                               { name: "city", label: "City" },
                               { name: "postcode", label: "PIN code" },
+                              select(
+                                "stateCode",
+                                "Delivery state",
+                                states.map(([value, label]) => ({
+                                  value,
+                                  label,
+                                })),
+                              ),
+                              {
+                                name: "gstin",
+                                label: "Buyer GSTIN (optional)",
+                                required: false,
+                              },
                             ],
                             submit: async (address) => {
                               await api("orders", "POST", {
@@ -2191,7 +2043,7 @@ export function Portal({ role }: { role: string }) {
               </div>
             </>
           )}
-          {tab === "orders" && (
+          {tab === "orders" && !shopView && (
             <section className="panel">
               <DataTable
                 head={
@@ -2265,6 +2117,9 @@ export function Portal({ role }: { role: string }) {
                         money(o.total_paise),
                         status(o.status),
                         <div className="row-actions">
+                          {o.invoices?.map((invoice: any) => (
+                            <InvoiceButton key={invoice.id} id={invoice.id} />
+                          ))}
                           {o.status === "pending_payment" &&
                             o.customer_id === data.user.id &&
                             button(
@@ -2283,7 +2138,7 @@ export function Portal({ role }: { role: string }) {
               />
             </section>
           )}
-          {tab === "inventory" && (
+          {tab === "inventory" && !shopView && (
             <section className="panel">
               <DataTable
                 head={[
@@ -2345,7 +2200,7 @@ export function Portal({ role }: { role: string }) {
               />
             </section>
           )}
-          {tab === "vendors" && (
+          {tab === "vendors" && !shopView && (
             <section className="panel">
               <DataTable
                 head={["Partner", "Owner", "Commission", "Status", "Actions"]}
@@ -2423,7 +2278,7 @@ export function Portal({ role }: { role: string }) {
               />
             </section>
           )}
-          {tab === "finance" && (
+          {tab === "finance" && !shopView && (
             <>
               <section className="panel">
                 <h2>
@@ -2837,34 +2692,46 @@ export function Portal({ role }: { role: string }) {
           )}
         </main>
       </div>
-      <BottomNav
-        active={
-          (tab === "overview"
-            ? "home"
-            : ["appointments", "plans"].includes(tab)
-              ? "care"
-              : ["learning", "teaching", "admissions"].includes(tab)
-                ? "learn"
-                : ["shop", "inventory"].includes(tab)
-                  ? "shop"
-                  : "account") as Destination
-        }
-        links={{
-          home: `/portal/${role}`,
-          care: allowedTabs.includes("appointments")
-            ? `/portal/${role}?tab=appointments`
-            : "/care",
-          learn: allowedTabs.includes("learning")
-            ? `/portal/${role}?tab=learning`
-            : allowedTabs.includes("teaching")
-              ? `/portal/${role}?tab=teaching`
-              : "/learn",
-          shop: allowedTabs.includes("shop")
-            ? `/portal/${role}?tab=shop`
-            : "/shop",
-          account: `/portal/${role}?tab=account`,
-        }}
-      />
+      {vendor ? (
+        <SupplierBottomNav tab={tab} />
+      ) : (
+        <BottomNav
+          active={
+            (tab === "overview"
+              ? "home"
+              : ["appointments", "plans"].includes(tab)
+                ? "care"
+                : ["learning", "teaching", "admissions"].includes(tab)
+                  ? "learn"
+                  : [
+                        "shop",
+                        "inventory",
+                        "shopdesk",
+                        "vendors",
+                        "orders",
+                      ].includes(tab)
+                    ? "shop"
+                    : "account") as Destination
+          }
+          links={{
+            home: `/portal/${role}`,
+            care: allowedTabs.includes("appointments")
+              ? `/portal/${role}?tab=appointments`
+              : "/care",
+            learn: allowedTabs.includes("learning")
+              ? `/portal/${role}?tab=learning`
+              : allowedTabs.includes("teaching")
+                ? `/portal/${role}?tab=teaching`
+                : "/learn",
+            shop: allowedTabs.includes("shop")
+              ? `/portal/${role}?tab=shop`
+              : ["admin", "finance"].includes(role)
+                ? `/portal/${role}?tab=shopdesk`
+                : "/shop",
+            account: `/portal/${role}?tab=account`,
+          }}
+        />
+      )}
       {booking && (
         <BookingSheet
           catalog={catalog}
@@ -2963,12 +2830,12 @@ function studentTitle(role: string) {
 }
 function studentDescription(role: string) {
   return role === "student"
-    ? "Pick up your lessons, prepare for your next class and keep your learning goals in sight."
+    ? "Your lessons. Your next step."
     : role === "vendor"
-      ? "Keep stock current, track orders and see your commission statement in one place."
+      ? "Stock, sales and your account with INCYS."
       : role === "trainer"
-        ? "Organize classes, review submissions and support your learners."
+        ? "Teach, review and connect."
         : role === "admin"
-          ? "Review applications, support your team and follow through on the details that matter."
+          ? "Care, learning and business at a glance."
           : "Keep appointments, follow-ups and your learning together in one connected space.";
 }

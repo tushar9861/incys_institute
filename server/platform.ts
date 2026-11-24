@@ -5,6 +5,7 @@ import { requireThat } from "./errors";
 import { appointments } from "./clinic";
 import { enrolments, cohortAccess } from "./learning";
 import { orderList } from "./commerce";
+import { adjustStock } from "./shop";
 const uuid = z.string().uuid(),
   text = z.string().trim().min(1).max(300),
   content = z.string().trim().min(3).max(15000);
@@ -30,7 +31,7 @@ export async function catalog() {
       (SELECT count(*)::int FROM enrolments e WHERE e.cohort_id=h.id AND e.status<>'withdrawn') AS enrolled
       FROM cohorts h JOIN course_versions v ON v.id=h.version_id JOIN courses c ON c.id=v.course_id JOIN users u ON u.id=h.trainer_id WHERE c.published ORDER BY h.starts_at`),
     rows(
-      "SELECT p.*,v.name AS vendor_name FROM products p JOIN vendors v ON v.id=p.vendor_id WHERE p.status='approved' AND v.status='approved' AND (p.expires_on IS NULL OR p.expires_on>current_date) ORDER BY p.name",
+      "SELECT p.id,p.name,p.category,p.description,p.price_paise,p.stock,p.unit,v.name AS vendor_name FROM products p JOIN vendors v ON v.id=p.vendor_id WHERE p.status='approved' AND v.status='approved' AND (p.expires_on IS NULL OR p.expires_on>current_date) ORDER BY p.name",
     ),
     rows(
       "SELECT id,title,body,created_at FROM announcements WHERE published AND audience='public' ORDER BY created_at DESC LIMIT 10",
@@ -409,23 +410,32 @@ export async function createResource(user: User, kind: string, input: unknown) {
         [user.id],
       );
     } else if (kind === "products") {
-      allow(user, "vendor");
+      allow(user, "vendor", "admin");
       const d = z
         .object({
+          vendorId: uuid.optional(),
           name: text,
           category: text,
           description: content,
           pricePaise: z.number().int().min(100).max(10000000),
           stock: z.number().int().min(0).max(100000),
-          regulated: z.boolean(),
+          regulated: z.boolean().default(false),
+          sku: z.string().trim().max(100).default(""),
+          hsnCode: z
+            .string()
+            .regex(/^(?:\d{4}|\d{6}|\d{8})?$/)
+            .default(""),
+          gstRateBps: z.number().int().min(0).max(10000).default(0),
+          reorderLevel: z.number().int().min(0).max(100000).default(5),
+          unit: z.string().trim().min(1).max(12).default("PCS"),
           licenceReference: z.string().max(300).optional(),
           batch: z.string().max(100).optional(),
           expiresOn: z.iso.date().optional(),
         })
         .parse(input);
       const v = await one(
-        "SELECT * FROM vendors WHERE owner_id=$1 AND status='approved'",
-        [user.id],
+        "SELECT * FROM vendors WHERE status='approved' AND (($2::boolean AND id=$3) OR (NOT $2 AND owner_id=$1))",
+        [user.id, has(user, "admin"), d.vendorId || null],
         db,
       );
       requireThat(v, 403, "Your vendor account must be approved first.");
@@ -435,7 +445,7 @@ export async function createResource(user: User, kind: string, input: unknown) {
         "Regulated products require licence, batch and expiry details.",
       );
       result = await one(
-        "INSERT INTO products(vendor_id,name,category,description,price_paise,stock,regulated,licence_reference,batch,expires_on) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *",
+        "INSERT INTO products(vendor_id,name,category,description,price_paise,stock,regulated,licence_reference,batch,expires_on,sku,hsn_code,gst_rate_bps,reorder_level,unit) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *",
         [
           v.id,
           d.name,
@@ -447,9 +457,19 @@ export async function createResource(user: User, kind: string, input: unknown) {
           d.licenceReference || null,
           d.batch || null,
           d.expiresOn || null,
+          d.sku,
+          d.hsnCode,
+          d.gstRateBps,
+          d.reorderLevel,
+          d.unit,
         ],
         db,
       );
+      if (d.stock)
+        await db.query(
+          "INSERT INTO stock_movements(product_id,delta,balance,kind,reference,reason,actor_id) VALUES($1::uuid,$2,$2,'opening',$1::text,'Initial stock declaration',$3)",
+          [result!.id, d.stock, user.id],
+        );
     } else if (kind === "tickets") {
       const d = z.object({ subject: text, message: content }).parse(input);
       result = await one(
@@ -483,6 +503,21 @@ export async function updateResource(
   id: string,
   input: unknown,
 ) {
+  // Preserve the older mobile API, while keeping all stock changes in the audit trail.
+  if (
+    kind === "products" &&
+    !has(user, "admin") &&
+    (input as any)?.addStock !== undefined
+  ) {
+    const d = z
+      .object({ addStock: z.number().int().min(1).max(10000) })
+      .parse(input);
+    return adjustStock(user, id, {
+      delta: d.addStock,
+      reason: "Stock adjustment via legacy client",
+      idempotencyKey: crypto.randomUUID(),
+    });
+  }
   return transaction(async (db) => {
     let result;
     if (kind === "vendors") {

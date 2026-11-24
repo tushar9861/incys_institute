@@ -17,6 +17,7 @@ import * as commerce from "./commerce";
 import * as platform from "./platform";
 import * as assessments from "./assessments";
 import * as refunds from "./refunds";
+import * as shop from "./shop";
 import { boundedBody } from "./request-body";
 import { allowedOrigin } from "./origin";
 import { authorizedWorkerRequest } from "./job-auth";
@@ -72,6 +73,11 @@ export async function route(request: Request, path: string[]) {
       });
     if (key === "health" && method === "GET") {
       await pool.query("SELECT 1 FROM services LIMIT 0");
+      requireThat(
+        await one("SELECT id FROM shop_settings WHERE id=true"),
+        503,
+        "Shop migration is not ready.",
+      );
       return json({ status: "ok" });
     }
     if (key === "config" && method === "GET")
@@ -200,7 +206,7 @@ export async function route(request: Request, path: string[]) {
       );
       return json({ removed: true });
     }
-    if (path.length > 1 && !["payments"].includes(path[0]))
+    if (path.length > 1 && !["payments", "shop"].includes(path[0]))
       z.string().uuid().parse(path[1]);
     if (key === "appointments" && method === "POST")
       return json(await clinic.bookAppointment(user, body), 201);
@@ -275,6 +281,36 @@ export async function route(request: Request, path: string[]) {
     }
     if (key === "orders" && method === "POST")
       return json(await commerce.placeOrder(user, body), 201);
+    if (key === "shop/workspace" && method === "GET")
+      return json(
+        await shop.shopWorkspace(user, new URL(request.url).searchParams),
+      );
+    if (key === "shop/settings" && method === "PATCH")
+      return json(await shop.saveSettings(user, body));
+    if (key === "shop/supplies" && method === "POST")
+      return json(await shop.receiveSupply(user, body), 201);
+    if (key === "shop/suppliers" && method === "POST")
+      return json(await shop.addSupplier(user, body), 201);
+    if (key === "shop/supplier-payments" && method === "POST")
+      return json(await shop.recordSupplierPayment(user, body), 201);
+    if (path[0] === "shop" && path.length === 4 && method === "POST") {
+      if (path[1] === "products" && path[3] === "stock")
+        return json(await shop.adjustStock(user, path[2], body));
+      if (path[1] === "supplies" && path[3] === "return")
+        return json(await shop.returnSupply(user, path[2], body));
+      if (path[1] === "supplier-payments" && path[3] === "reverse")
+        return json(await shop.reverseSupplierPayment(user, path[2], body));
+      if (path[1] === "orders" && path[3] === "invoice")
+        return json(await shop.issueInvoice(user, path[2]), 201);
+    }
+    if (path[0] === "shop" && path.length === 3) {
+      if (path[1] === "products" && method === "PATCH")
+        return json(await shop.editProduct(user, path[2], body));
+      if (path[1] === "suppliers" && method === "PATCH")
+        return json(await shop.supplierProfile(user, path[2], body));
+      if (path[1] === "invoices" && method === "GET")
+        return json(await shop.readInvoice(user, path[2]));
+    }
     if (path[0] === "orders" && path[2] === "cancel" && method === "POST")
       return json(await commerce.cancelOrder(user, path[1]));
     if (path[0] === "order-items" && method === "PATCH")

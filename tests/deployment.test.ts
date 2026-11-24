@@ -65,6 +65,10 @@ test("deployed runtime can use application tables but cannot change schema or im
       "UPDATE clinical_notes SET body=body WHERE false",
       "DELETE FROM audit_events WHERE false",
       "DELETE FROM ledger_entries WHERE false",
+      "UPDATE stock_movements SET reason='changed' WHERE false",
+      "DELETE FROM supply_documents WHERE false",
+      "DELETE FROM supplier_payments WHERE false",
+      "DELETE FROM shop_invoices WHERE false",
     ]) {
       await assert.rejects(runtime.query(sql), { code: "42501" });
     }

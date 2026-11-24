@@ -182,7 +182,7 @@ test("concurrent orders cannot oversell the last item", async () => {
     0,
   );
 });
-test("payment capture is idempotent and creates a balanced 5% commission ledger", async () => {
+test("payment capture is idempotent and books institute retail revenue without vendor commission", async () => {
   const f = await storeFixture(),
     o = (await placeOrder(f.customer, f.input))!,
     p = await createPayment(f.customer, {
@@ -208,12 +208,12 @@ test("payment capture is idempotent and creates a balanced 5% commission ledger"
     0,
   );
   assert.equal(
-    ledger.find((l) => l.account === "institute_commission")!.amount_paise,
-    -5000,
+    ledger.find((l) => l.account === "retail_revenue")!.amount_paise,
+    -100000,
   );
   assert.equal(
-    ledger.find((l) => l.account.startsWith("vendor_payable"))!.amount_paise,
-    -95000,
+    ledger.some((l) => l.account.startsWith("vendor_payable")),
+    false,
   );
   assert.equal(
     (await one("SELECT status FROM orders WHERE id=$1", [o.id]))!.status,
@@ -560,15 +560,14 @@ test("refund approval separates requester and approver, reverses ledger and rest
     "SELECT account,amount_paise FROM ledger_entries WHERE payment_id=$1",
     [p.id],
   );
-  assert.equal(ledger.length, 6);
+  assert.equal(ledger.length, 4);
   assert.equal(
     ledger.reduce((n, l) => n + l.amount_paise, 0),
     0,
   );
   assert.equal(
-    ledger.find((l) => l.account === "refund:institute_commission")
-      ?.amount_paise,
-    5000,
+    ledger.find((l) => l.account === "refund:retail_revenue")?.amount_paise,
+    100000,
   );
   assert.equal(
     (await one("SELECT stock FROM products WHERE id=$1", [f.product.id]))!

@@ -4,6 +4,7 @@ import { rows, one, pool, transaction, audit, emit, type DB } from "./db";
 import { type User, has, allow, isDemo } from "./auth";
 import { requireThat, AppError } from "./errors";
 import { processRefund } from "./refunds";
+import { settings, taxSnapshot, recordStock } from "./shop";
 const uuid = z.string().uuid();
 export async function placeOrder(user: User, input: unknown) {
   const d = z
@@ -23,6 +24,8 @@ export async function placeOrder(user: User, input: unknown) {
         line: z.string().min(5).max(300),
         city: z.string().min(2).max(100),
         postcode: z.string().regex(/^[0-9]{6}$/),
+        stateCode: z.string().max(2).optional(),
+        gstin: z.string().trim().toUpperCase().max(15).optional(),
       }),
       idempotencyKey: z.string().min(16).max(100),
     })
@@ -70,19 +73,25 @@ export async function placeOrder(user: User, input: unknown) {
       items.push({
         p,
         quantity: i.quantity,
-        commission: Math.round((value * p.commission_bps) / 10000),
+        commission: 0,
       });
     }
+    const snapshot = taxSnapshot(await settings(db), items, d.address);
     const order = await one(
-      "INSERT INTO orders(customer_id,total_paise,address,idempotency_key) VALUES($1,$2,$3,$4) RETURNING *",
-      [user.id, total, d.address, d.idempotencyKey],
+      "INSERT INTO orders(customer_id,total_paise,address,idempotency_key,commerce_model,tax_snapshot) VALUES($1,$2,$3,$4,'institute_retail',$5) RETURNING *",
+      [user.id, total, d.address, d.idempotencyKey, snapshot],
       db,
     );
     for (const { p, quantity, commission } of items) {
-      await db.query("UPDATE products SET stock=stock-$1 WHERE id=$2", [
-        quantity,
+      await recordStock(
+        db,
         p.id,
-      ]);
+        -quantity,
+        "reservation",
+        order!.id,
+        "Customer order",
+        user.id,
+      );
       await db.query(
         "INSERT INTO order_items(order_id,product_id,vendor_id,product_name,quantity,unit_paise,commission_paise) VALUES($1,$2,$3,$4,$5,$6,$7)",
         [
@@ -107,12 +116,12 @@ export async function orderList(user: User) {
   if (vendor)
     return rows(
       `SELECT i.*,o.created_at,o.status AS order_status,
-    CASE WHEN o.status IN ('paid','processing','completed') THEN o.address ELSE NULL END AS address
+    CASE WHEN o.commerce_model='legacy_marketplace' AND o.status IN ('paid','processing','completed') THEN o.address ELSE NULL END AS address
     FROM order_items i JOIN orders o ON o.id=i.order_id JOIN vendors v ON v.id=i.vendor_id WHERE v.owner_id=$1 ORDER BY o.created_at DESC LIMIT 200`,
       [user.id],
     );
   const orders = await rows(
-    `SELECT o.*,u.name AS customer_name FROM orders o JOIN users u ON u.id=o.customer_id ${admin ? "" : "WHERE o.customer_id=$1"} ORDER BY o.created_at DESC LIMIT 200`,
+    `SELECT o.*,u.name AS customer_name,(SELECT jsonb_agg(jsonb_build_object('id',si.id,'number',si.number,'kind',si.kind)) FROM shop_invoices si WHERE si.order_id=o.id) AS invoices FROM orders o JOIN users u ON u.id=o.customer_id ${admin ? "" : "WHERE o.customer_id=$1"} ORDER BY o.created_at DESC LIMIT 200`,
     admin ? [] : [user.id],
   );
   for (const o of orders)
@@ -205,10 +214,14 @@ export async function releaseStock(db: DB, id: string) {
     db,
   );
   for (const i of items)
-    await db.query("UPDATE products SET stock=stock+$1 WHERE id=$2", [
-      i.quantity,
+    await recordStock(
+      db,
       i.product_id,
-    ]);
+      i.quantity,
+      "release",
+      `cancel:${id}`,
+      "Order cancelled or expired",
+    );
   await db.query(
     "UPDATE order_items SET status='cancelled' WHERE order_id=$1",
     [id],
@@ -410,21 +423,42 @@ export async function capturePayment(
         [r.id],
         db,
       );
-      const commission = items.reduce((a, i) => a + i.commission_paise, 0);
-      await db.query(
-        "INSERT INTO ledger_entries(payment_id,account,amount_paise,reference_id) VALUES($1,$2,$3,$4)",
-        [p.id, "institute_commission", -commission, r.id],
-      );
-      for (const i of items)
+      if (r.commerce_model === "institute_retail") {
+        const totals = r.tax_snapshot?.totals;
+        requireThat(
+          totals && totals.net + totals.tax === amount,
+          409,
+          "Order tax totals need reconciliation.",
+        );
+        for (const [account, value] of [
+          ["retail_revenue", totals.net],
+          ["output_cgst", totals.cgst],
+          ["output_sgst_utgst", totals.sgst],
+          ["output_igst", totals.igst],
+        ] as [string, number][]) {
+          if (value)
+            await db.query(
+              "INSERT INTO ledger_entries(payment_id,account,amount_paise,reference_id) VALUES($1,$2,$3,$4)",
+              [p.id, account, -value, r.id],
+            );
+        }
+      } else {
+        const commission = items.reduce((a, i) => a + i.commission_paise, 0);
         await db.query(
           "INSERT INTO ledger_entries(payment_id,account,amount_paise,reference_id) VALUES($1,$2,$3,$4)",
-          [
-            p.id,
-            `vendor_payable:${i.vendor_id}`,
-            -(i.unit_paise * i.quantity - i.commission_paise),
-            i.id,
-          ],
+          [p.id, "institute_commission", -commission, r.id],
         );
+        for (const i of items)
+          await db.query(
+            "INSERT INTO ledger_entries(payment_id,account,amount_paise,reference_id) VALUES($1,$2,$3,$4)",
+            [
+              p.id,
+              `vendor_payable:${i.vendor_id}`,
+              -(i.unit_paise * i.quantity - i.commission_paise),
+              i.id,
+            ],
+          );
+      }
     } else {
       if (p.reference_type === "appointment") {
         requireThat(

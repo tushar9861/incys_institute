@@ -140,6 +140,7 @@ export async function processRefund(id: string, providerRefundId: string) {
       // This receipt was never allocated to a purchase. Its reversal must not
       // restore inventory or deduct fees a second time.
     } else if (p.reference_type === "order") {
+      await creditInvoice(db, p.reference_id, r.id);
       await db.query("UPDATE orders SET status='refunded' WHERE id=$1", [
         p.reference_id,
       ]);
@@ -151,10 +152,14 @@ export async function processRefund(id: string, providerRefundId: string) {
       );
       for (const i of items)
         if (["pending", "accepted"].includes(i.status))
-          await db.query("UPDATE products SET stock=stock+$1 WHERE id=$2", [
-            i.quantity,
+          await recordStock(
+            db,
             i.product_id,
-          ]);
+            i.quantity,
+            "release",
+            `refund:${r.id}`,
+            "Unsent order refunded",
+          );
       await db.query(
         "UPDATE order_items SET status='refunded' WHERE order_id=$1",
         [p.reference_id],
@@ -181,3 +186,4 @@ export async function processRefund(id: string, providerRefundId: string) {
     return { refunded: true };
   });
 }
+import { creditInvoice, recordStock } from "./shop";

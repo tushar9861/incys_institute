@@ -40,7 +40,7 @@ GRANT USAGE ON SCHEMA incys TO incys_app;
 GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA incys TO incys_app;
 GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA incys TO incys_app;
 REVOKE ALL ON incys.schema_migrations FROM incys_app;
-REVOKE UPDATE,DELETE ON incys.clinical_notes,incys.audit_events,incys.ledger_entries FROM incys_app;
+REVOKE UPDATE,DELETE ON incys.clinical_notes,incys.audit_events,incys.ledger_entries,incys.stock_movements,incys.supply_documents,incys.supplier_payments,incys.shop_invoices FROM incys_app;
 DO $incys_rls$ DECLARE entry record; BEGIN
   FOR entry IN SELECT tablename FROM pg_tables WHERE schemaname='incys' LOOP
     EXECUTE format('ALTER TABLE incys.%I ENABLE ROW LEVEL SECURITY',entry.tablename);

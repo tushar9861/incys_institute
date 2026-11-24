@@ -6,11 +6,11 @@ export function WellnessArt() {
       fill="none"
       aria-hidden="true"
     >
-      <circle cx="207" cy="184" r="154" fill="#dae8d7" />
+      <circle cx="207" cy="184" r="154" fill="#dacaf5" />
       <circle cx="207" cy="184" r="122" stroke="#ffffff" strokeOpacity=".5" />
       <path
         d="M57 323C92 289 322 288 365 323C334 354 103 356 57 323Z"
-        fill="#b8ccbb"
+        fill="#9bd9c6"
       />
       <path
         d="M66 294C68 224 42 192 54 152M60 235C29 234 25 204 31 192C52 193 64 207 60 235ZM58 196C80 188 88 166 82 150C62 153 53 169 58 196ZM333 298C318 255 329 218 351 194M331 254C357 253 369 231 361 217C340 216 331 233 331 254Z"

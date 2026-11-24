@@ -168,7 +168,6 @@ export function PublicSite({ view = "home" }: { view?: Destination }) {
           <>
             <div className="home-greeting">
               <div>
-                <p className="micro-label">YOUR EVERYDAY WELLBEING</p>
                 <h1>
                   Feel more like <em>you.</em>
                 </h1>
@@ -188,7 +187,7 @@ export function PublicSite({ view = "home" }: { view?: Destination }) {
                   <br />
                   Find your balance.
                 </h2>
-                <p>Find your next step with INCYS.</p>
+
                 <Link href="/care" className="button">
                   Explore care
                 </Link>
@@ -234,7 +233,6 @@ export function PublicSite({ view = "home" }: { view?: Destination }) {
                     <Icon size={25} />
                   </span>
                   <strong>{label}</strong>
-                  <small>{detail}</small>
                 </Link>
               ))}
             </section>
@@ -556,7 +554,7 @@ export function PublicSite({ view = "home" }: { view?: Destination }) {
         <footer className="consumer-footer">
           <Brand compact />
           <span>
-            Institute of Nature Cure & Yogic Science
+            Institute for Nature Cure & Yogic Sciences
             <br />
             <small>Balasore, Odisha</small>
           </span>
