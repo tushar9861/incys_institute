@@ -20,7 +20,7 @@ The Firebase Google provider is enabled and `incys-staging.onrender.com` is an a
 
 Keep nonce checks enabled. Copy the OAuth secret directly from Firebase Authentication → Google → Web SDK configuration into Supabase if configuring Supabase's redirect OAuth flow as well. Never commit or expose the secret to the browser. The application uses the Firebase popup and ID-token exchange rather than Supabase's redirect OAuth flow. `/api/v1/config` reports Google availability from Supabase's public provider settings with a 60-second cache; the button is hidden when unavailable. `GOOGLE_SIGN_IN_ENABLED=false` disables it explicitly. No SMS provider or billable OTP flow is enabled.
 
-Real user consent, account linking for an existing email identity, popup return on iPhone/Android, and staff MFA after Google sign-in require account/device acceptance; provider configuration checks alone are not an end-to-end sign-in test.
+The user confirmed a successful personal Google sign-in on 24 November 2026. Automated hosted checks also verified the Firebase popup reaches Google, the email sign-in UI opens the patient workspace, and logout revokes access. Existing-email account linking, staff MFA after Google sign-in, and popup return on physical iPhone/Android devices still need their designated acceptance cases.
 
 ## Phone installation
 

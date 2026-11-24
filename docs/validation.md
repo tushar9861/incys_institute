@@ -7,7 +7,10 @@
 - TypeScript, formatting, production build with `NEXT_PUBLIC_AUTH_MODE=supabase`, and expanded production HTTP smoke checks passed.
 - Android trusted app shell assembled successfully with SDK 36 / JDK 21. APK signature matches the public Digital Asset Links certificate fingerprint. No physical device was attached.
 - Firebase Google provider enabled; live Render origin authorized. Google authorization initialization uses the expected web client and forwards the nonce. Supabase reports Google enabled and rejects an invalid Google ID token. These are configuration and negative checks, not a completed personal Google sign-in.
-- Live deployment acceptance for the new source is recorded in [Render deployment](render-deployment.md) after the deployment completes.
+- Hosted desktop/phone navigation, Google popup initiation, email UI sign-in, database workspace access, logout invalidation and public app assets passed. The user separately confirmed successful Google sign-in. Synthetic Auth identity was deleted; its app metadata was retired with an audit event.
+- Production service-worker acceptance passed: only the offline help page entered Cache Storage, private API requests failed offline, navigation showed the offline screen, and retry recovered after reconnecting.
+- Google Digital Asset Links verification returned `linked: true` for the shared Android app and staging host. Physical-device UI acceptance remains outstanding.
+- Live source/deployment IDs and CI status are recorded in [Render deployment](render-deployment.md).
 
 
 Observed development checks, not a production acceptance certificate.
