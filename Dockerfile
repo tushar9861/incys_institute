@@ -32,6 +32,7 @@ COPY --from=build --chown=incys:incys /app/.next/standalone ./
 COPY --from=build --chown=incys:incys /app/.next/static ./.next/static
 COPY --from=build --chown=incys:incys /app/scripts ./scripts
 COPY --from=build --chown=incys:incys /app/server ./server
+COPY --from=build --chown=incys:incys /app/config ./config
 COPY --from=build --chown=incys:incys /app/database ./database
 COPY --from=build --chown=incys:incys /app/services/scanner/protocol.mjs ./services/scanner/protocol.mjs
 COPY --from=build --chown=incys:incys /app/node_modules ./node_modules

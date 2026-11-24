@@ -2,7 +2,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
 import { z } from "zod";
 import { one, transaction, audit } from "./db";
 import { AppError, requireThat } from "./errors";
-import { supabaseServer } from "./supabase";
+import { supabaseServer, supabaseProjectUrl } from "./supabase";
 
 const identityClaims = z.object({
   sub: z.string().uuid(),
@@ -31,8 +31,7 @@ export async function verifiedSupabaseClaims(
 
 export async function authenticateSupabase(token: string) {
   const client = supabaseServer();
-  const url = (process.env.SUPABASE_URL ||
-    process.env.NEXT_PUBLIC_SUPABASE_URL)!.replace(/\/$/, "");
+  const url = supabaseProjectUrl();
   const issuer = `${url}/auth/v1`;
   if (!keys.has(issuer))
     keys.set(

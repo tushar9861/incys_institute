@@ -2,7 +2,7 @@
 
 An implemented development release for the Institute of Nature Cure & Yogic Science, Balasore. It includes a public website, role-based web workspaces, a shared PostgreSQL API, a Flutter Android client, and GCP infrastructure definitions. Advertising and marketing automation are excluded.
 
-**Status:** suitable for local functional review with synthetic data. The current deployment target is **Render Free + Supabase Free** for initial ₹0 testing; see [free staging](docs/free-staging.md). Hosting-account and repository write access are pending. GCP is paused because its linked billing account is closed. Provider integration tests, device acceptance, approved content and the remaining scope in [delivery status](docs/delivery-status.md) are required before launch. No real payments have been collected.
+**Status:** suitable for local functional review with synthetic data. The current deployment target is **Render Free + Supabase Free** for initial ₹0 testing; see [free staging](docs/free-staging.md). The selected [Supabase project is configured](docs/supabase-project.md); its server secret key, direct application connectivity, Render publication and repository write access remain pending. GCP is paused because its linked billing account is closed. Provider integration tests, device acceptance, approved content and the remaining scope in [delivery status](docs/delivery-status.md) are required before launch. No real payments have been collected.
 
 ## Run locally
 

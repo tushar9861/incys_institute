@@ -1,4 +1,4 @@
-# Validation record — 23 November 2026
+# Validation record — updated 24 November 2026
 
 Observed development checks, not a production acceptance certificate.
 
@@ -19,9 +19,13 @@ Observed development checks, not a production acceptance certificate.
 | Cloud authentication | Authorized Google Cloud account and ADC verified; Firebase CLI project access verified |
 | Cloud operations | Required APIs enabled; Android Firebase app registered; no compute/database/storage/Hosting release provisioned |
 | Deployment attempt | **Blocked**: Storage HTTP 403 “disabled in state delinquent”; linked “Firebase Payment” account reports `open: false`, despite project-level `billingEnabled: true` |
-| Free staging build | Next production build passed with Supabase mode and placeholder public build configuration; not a hosted authentication test |
+| Free staging build | Next production build passed with Supabase mode and the verified public configuration for `hfncwozklfposeokqoio`; not a hosted sign-in test |
 | Render configuration | Validated against Render's current public JSON Schema: one free web service, no paid database/disk/worker. CLI/platform account validation not performed |
-| Free staging deployment | Not deployed: selected provider-account access and GitHub write access pending; existing connected destinations were declined |
+| Supabase provisioning | Six migrations, 43 RLS-protected tables, restricted runtime login and private 10 MiB document bucket configured on the selected Free project; security advisors report no findings |
+| Hosted permissions/auth configuration | Public roles have no app-schema/session-function access; runtime lacks schema creation, migration metadata and immutable-update privileges. ES256 key, password sign-in and required email confirmation verified |
+| Live HTTP checks | Configured backend SDK received `403/bad_jwt` for an invalid token; Data API rejected `incys` schema with `406/PGRST106`; public bucket metadata access denied |
+| Direct runtime connection | Not verified: IPv6 direct endpoint unreachable and session-pooler TCP refused from this managed workspace. Management-role impersonation denied; the optional membership grant was rejected and not applied |
+| Free staging deployment | Supabase schema/public configuration applied. Render website/API not published; server secret key and GitHub write access still pending |
 | Physical Android-device, provider payments, cloud IAM/scanner and full accessibility acceptance | Not performed |
 
 The backend tests use a separate PostgreSQL database ending in `_test`. Browser checks use synthetic local demo accounts and files; local browser uploads do not invoke the production scanner. The scanner was tested independently against the real ClamAV container. Supabase schema tests emulate the provider's session table locally and verify RLS still blocks the anonymous role after an accidental SELECT grant. These results do not establish live Supabase/Firebase MFA, password recovery, payment/webhook/refund processing, hosted private storage or FCM delivery.

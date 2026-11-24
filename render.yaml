@@ -31,13 +31,13 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_URL
-        sync: false
+        value: https://hfncwozklfposeokqoio.supabase.co
       - key: NEXT_PUBLIC_SUPABASE_URL
-        sync: false
+        value: https://hfncwozklfposeokqoio.supabase.co
       - key: SUPABASE_PUBLISHABLE_KEY
-        sync: false
+        value: sb_publishable_vPflg7sNdrI0aPbg_WTsDQ_PLoIOwTE
       - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-        sync: false
+        value: sb_publishable_vPflg7sNdrI0aPbg_WTsDQ_PLoIOwTE
       - key: SUPABASE_SECRET_KEY
         sync: false
       - key: WORKER_TOKEN

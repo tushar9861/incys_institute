@@ -8,6 +8,9 @@ export const hostedAuthEnabled =
   authMode === "firebase" || authMode === "supabase";
 export const supabaseEnabled = authMode === "supabase";
 export const supabaseConfig = {
-  url: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  key: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "",
+  url: process.env.NEXT_PUBLIC_SUPABASE_URL || registeredSupabase.url,
+  key:
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    registeredSupabase.publishableKey,
 };
+import registeredSupabase from "@/config/supabase.web.json";
