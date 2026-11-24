@@ -49,3 +49,11 @@ The shared interface uses a brighter teal with violet and coral accents, shorter
 Migration `007_institute_shop.sql` adds six private tables and product/order fields. Apply it before deploying the new server, then refresh runtime grants/RLS. An older server still gets the historical order-model default during rollout; the new checkout explicitly selects the retailer model. Do not seed synthetic products or invoices into the hosted institute project.
 
 Local checks cover supplier isolation, concurrent stock changes, duplicate receipts, payment overpayment/reversal, historical statement balances, supplier returns, GST rounding, financial-year boundaries, concurrent invoice numbering, immutable snapshots, linked refund credit notes, restricted runtime permissions and historical commission compatibility. Browser checks cover supplier/admin operations, CSV export, invoice printing, customer invoice access, all eight workspaces, reduced motion, and phone/tablet/desktop navigation.
+
+## Current release state — 24 November 2026
+
+Implementation commit `9f5cb7d5bc3cef3935464ac1af5227d16c01cc1f` passed all 37 backend checks, 23 browser scenarios, production build, scanner checks, shared Android build and the legacy Flutter checks in [GitHub Actions](https://github.com/tushar9861/incys_institute/actions/runs/45372646877). The invoice PDF was also inspected as a single A4 page with synthetic data.
+
+**This upgrade is not yet live.** The migration connector repeatedly reset before the database received the write, and the dashboard automation could not connect. Readbacks confirmed migration 007 and its six new tables were absent. A complete, transactional, replay-safe SQL script is prepared at `/workspace/artifacts/INCYS-shop-upgrade.sql` for the owner to run in this project's SQL Editor. The current live service remains on its previous release. After the owner applies it, verify RLS/runtime grants, deploy the tested commit, and perform hosted smoke checks. Do not report the new shop as deployed before that verification.
+
+The owner has designated an administrator email, but its verified sign-in identity was not yet present when checked. Granting the first administrator remains pending that sign-in; do not create an unverified privileged account or bypass the authenticator requirement.
