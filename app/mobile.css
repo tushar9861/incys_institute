@@ -2281,3 +2281,36 @@ textarea {
     width: 55%;
   }
 }
+/* Standalone phones can draw behind the status bar and landscape notch. */
+.consumer-header {
+  height: calc(96px + env(safe-area-inset-top));
+  padding-top: calc(20px + env(safe-area-inset-top));
+  padding-left: max(32px, env(safe-area-inset-left));
+  padding-right: max(32px, env(safe-area-inset-right));
+}
+.app-header {
+  padding-top: calc(14px + env(safe-area-inset-top));
+  min-height: calc(74px + env(safe-area-inset-top));
+}
+.header-actions > a.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 700px) {
+  .consumer-header {
+    height: calc(80px + env(safe-area-inset-top));
+    padding-top: calc(18px + env(safe-area-inset-top));
+    padding-left: max(22px, env(safe-area-inset-left));
+    padding-right: max(22px, env(safe-area-inset-right));
+  }
+  .login-story {
+    padding-top: calc(24px + env(safe-area-inset-top));
+  }
+  .app-header {
+    height: calc(74px + env(safe-area-inset-top));
+  }
+  .header-actions > a.avatar {
+    display: inline-flex;
+  }
+}

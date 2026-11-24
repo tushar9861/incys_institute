@@ -856,9 +856,13 @@ export function Portal({ role }: { role: string }) {
           <div className="header-actions">
             <span className="timezone">Times shown in IST</span>
             <Link href="/">Explore INCYS</Link>
-            <span className="avatar small-avatar">
+            <Link
+              href={`/portal/${role}?tab=account`}
+              className="avatar small-avatar"
+              aria-label="Open account"
+            >
               {data.user.name.slice(0, 1)}
-            </span>
+            </Link>
           </div>
         </header>
         {demo && (
