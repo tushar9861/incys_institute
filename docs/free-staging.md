@@ -6,7 +6,7 @@ This is for small, synthetic-data tests. Render sleeps after inactivity and its 
 
 ## Prerequisites and current status
 
-The selected Supabase project `hfncwozklfposeokqoio` is configured with the application schema, restricted runtime login, public client settings and private bucket. See the [verified project configuration](supabase-project.md) for checks and remaining credentials. No Render service has been created; its intended workspace and repository write access still need resolution.
+The selected Supabase project `hfncwozklfposeokqoio` is configured with the application schema, restricted runtime login, public client settings and private bucket. The protected local server key passed live Storage and administrator identity lookup checks. See the [verified project configuration](supabase-project.md) for results and remaining deployment work. No Render service has been created; its intended workspace and repository write access still need resolution.
 
 The supplied GitHub repository is `tushar9861/incys_institute`. It is empty and the connected GitHub account currently has read-only access. Push the reviewed development branch once write access is available. Render must be able to clone that branch; local source alone cannot be deployed by its Git builder.
 

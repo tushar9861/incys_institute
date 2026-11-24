@@ -11,7 +11,7 @@ Observed development checks, not a production acceptance certificate.
 | Visual inspection | Desktop patient and phone student overview screenshots inspected; not a full accessibility audit |
 | Scanner protocol/service tests | **5 passed**: exact clean verdict, malware rejection, engine failure, signature freshness and bounded bodies |
 | Real ClamAV container | Built and ran locally; accepted a clean synthetic PDF and rejected the benign EICAR antivirus test file with HTTP 422 |
-| Deferred scanner pipeline | Passed with real ClamAV through a local test relay: clean approval, EICAR rejection and operator audit. Used a disposable test database; hosted Storage remains untested |
+| Deferred scanner pipeline | Passed with real ClamAV through a local test relay: clean approval, EICAR rejection and operator audit. Used a disposable test database; a combined hosted upload/scanner workflow remains untested |
 | Flutter static analysis | Passed with no issues |
 | Flutter API/session/document tests | **3 passed**: session persistence, authentication, multipart content, file download, permission errors and oversized upload rejection |
 | Android APK | Debug build targets registered Android Firebase app and intended HTTPS API using `mobile/config/live.json`; backend must be deployed before it connects |
@@ -24,11 +24,12 @@ Observed development checks, not a production acceptance certificate.
 | Supabase provisioning | Six migrations, 43 RLS-protected tables, restricted runtime login and private 10 MiB document bucket configured on the selected Free project; security advisors report no findings |
 | Hosted permissions/auth configuration | Public roles have no app-schema/session-function access; runtime lacks schema creation, migration metadata and immutable-update privileges. ES256 key, password sign-in and required email confirmation verified |
 | Live HTTP checks | Configured backend SDK received `403/bad_jwt` for an invalid token; Data API rejected `incys` schema with `406/PGRST106`; public bucket metadata access denied |
+| Live private Storage and server key | Passed using the application's adapter: private 10 MiB bucket confirmed, synthetic PDF upload and byte-identical download, publishable-key/public-URL download denied, test object deleted and absence verified. Administrator identity lookup succeeded; no users changed |
 | Direct runtime connection | Not verified: IPv6 direct endpoint unreachable and session-pooler TCP refused from this managed workspace. Management-role impersonation denied; the optional membership grant was rejected and not applied |
-| Free staging deployment | Supabase schema/public configuration applied. Render website/API not published; server secret key and GitHub write access still pending |
+| Free staging deployment | Supabase schema/public configuration applied; server key configured in the protected local environment and verified. Render website/API not published; Render workspace selection and GitHub write access still pending |
 | Physical Android-device, provider payments, cloud IAM/scanner and full accessibility acceptance | Not performed |
 
-The backend tests use a separate PostgreSQL database ending in `_test`. Browser checks use synthetic local demo accounts and files; local browser uploads do not invoke the production scanner. The scanner was tested independently against the real ClamAV container. Supabase schema tests emulate the provider's session table locally and verify RLS still blocks the anonymous role after an accidental SELECT grant. These results do not establish live Supabase/Firebase MFA, password recovery, payment/webhook/refund processing, hosted private storage or FCM delivery.
+The backend tests use a separate PostgreSQL database ending in `_test`. Browser checks use synthetic local demo accounts and files; local browser uploads do not invoke the production scanner. The scanner was tested independently against the real ClamAV container. Supabase schema tests emulate the provider's session table locally and verify RLS still blocks the anonymous role after an accidental SELECT grant. The live private Storage check exercised the adapter directly, without the application's authenticated upload API, database records or scanner. These results do not establish live Supabase/Firebase MFA, password recovery, payment/webhook/refund processing, a complete hosted document workflow or FCM delivery.
 
 Earlier platform-container runtime, migration and worker checks passed. The latest application changes passed the Next build and HTTP smoke; the production image will be rebuilt by the deployment pipeline. The production npm dependency audit reported zero known vulnerabilities during this development session; an audit is not a security assessment.
 
