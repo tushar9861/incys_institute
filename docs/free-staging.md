@@ -6,11 +6,13 @@ This is for small, synthetic-data tests. Render sleeps after inactivity and its 
 
 ## Prerequisites and current status
 
-The selected Supabase project `hfncwozklfposeokqoio` is configured with the application schema, restricted runtime login, public client settings and private bucket. The protected local server key passed live Storage and administrator identity lookup checks. See the [verified project configuration](supabase-project.md) for results and remaining deployment work. No Render service has been created; its intended workspace and repository write access still need resolution.
+The selected Supabase project `hfncwozklfposeokqoio` is configured with the application schema, restricted runtime login, public client settings and private bucket. The website/API is live at [incys-staging.onrender.com](https://incys-staging.onrender.com) in the owner-confirmed Render workspace `nattis-game-workspace`. Live identity, database and private-upload checks passed. See [deployment details](render-deployment.md) and [verified project configuration](supabase-project.md).
 
-The supplied GitHub repository is `tushar9861/incys_institute`. It is empty and the connected GitHub account currently has read-only access. Push the reviewed development branch once write access is available. Render must be able to clone that branch; local source alone cannot be deployed by its Git builder.
+The supplied GitHub repository `tushar9861/incys_institute` now contains the source on `main`; collaborator write access is verified. Render builds that branch. Both automatic deploys and automatic Blueprint sync are off during initial testing. The Blueprint manages public service configuration; credentials remain in Render environment settings.
 
 ## Supabase setup
+
+The selected project is already provisioned. These steps describe a fresh setup; do not recreate its schema, credentials or bucket. Its runtime database URL uses `sslmode=verify-full&sslrootcert=config/supabase-ca-2021.crt`, with the provider's public root certificate included in the container.
 
 1. Create a dedicated project in the confirmed Free organization after confirming its quoted cost is zero. Singapore aligns with the proposed Render service. Confirm the final region before storing actual institutional records.
 2. Enable email/password, email confirmation and TOTP enrollment/verification. Set the actual website HTTPS origin as Site URL and allow its `/login` redirect. Use an asymmetric **ES256 or RS256** JWT signing key; this implementation rejects legacy HS256 tokens. Set a minimum password length of 12 and disable anonymous sign-ins.
@@ -71,6 +73,6 @@ A trusted scheduler can alternatively POST to `/api/v1/internal/worker` with `WO
 
 The owner must designate the administrator. After that identity's email is verified, set `BOOTSTRAP_SUPABASE_UID` to its exact ID and run `scripts/bootstrap-supabase-admin.ts` using the operator environment. This refuses to replace an existing administrator or link a different identity by email. Staff and vendors enroll an authenticator on the website. Every account with a verified factor must complete MFA before API access; the current Android client supports password sessions, so MFA-enabled accounts use the website.
 
-After the actual endpoint exists, build Android with `API_BASE_URL`, `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` Dart definitions. Never include a server secret. Mobile sessions use encrypted storage and refresh before expiry; requests allow 90 seconds for cold starts without automatically retrying mutations. The older `mobile/config/live.json` and integration APK still target the undeployed Firebase endpoint and are not Supabase builds.
+Build Android with `flutter build apk --debug --dart-define-from-file=config/staging.json` from `mobile/`. This configuration uses the live API URL and public Supabase settings. The resulting Supabase debug APK was built and checked for the correct endpoint and absence of the server key. Mobile sessions use encrypted storage and refresh before expiry; requests allow 90 seconds for cold starts without automatically retrying mutations. The older `mobile/config/live.json` and Firebase integration APK still target the undeployed Firebase endpoint.
 
 Hosted acceptance must cover registration/recovery, MFA, revoked sessions, booking conflicts, admissions/assessments, document scan transitions, cross-account isolation, jobs and payment test webhooks. Start with designated test identities and synthetic records. Razorpay test credentials and the institute administrator identity remain pending. See [delivery status](delivery-status.md) for remaining implementation and launch requirements.

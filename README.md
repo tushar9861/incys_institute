@@ -2,7 +2,7 @@
 
 An implemented development release for the Institute of Nature Cure & Yogic Science, Balasore. It includes a public website, role-based web workspaces, a shared PostgreSQL API, a Flutter Android client, and GCP infrastructure definitions. Advertising and marketing automation are excluded.
 
-**Status:** suitable for local functional review with synthetic data. The current deployment target is **Render Free + Supabase Free** for initial ₹0 testing; see [free staging](docs/free-staging.md). The selected [Supabase project is configured](docs/supabase-project.md), and the server key and private Storage adapter have passed live checks. Direct application database connectivity, Render publication and repository write access remain pending. GCP is paused because its linked billing account is closed. Provider integration tests, device acceptance, approved content and the remaining scope in [delivery status](docs/delivery-status.md) are required before launch. No real payments have been collected.
+**Testing site:** [incys-staging.onrender.com](https://incys-staging.onrender.com) is live on **Render Free + Supabase Free**. Live checks passed for database access, password sign-in, session revocation, private uploads and quarantine enforcement; demo authentication and simulated payments are disabled. See [deployment details](docs/render-deployment.md) and [free staging](docs/free-staging.md). The first institute administrator, approved catalogue content, email delivery, staff MFA, payments and remaining [launch acceptance](docs/delivery-status.md) still need completion. GCP remains paused because its billing account is closed. No real payments have been collected.
 
 ## Run locally
 
@@ -66,7 +66,7 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
 
 `10.0.2.2` reaches the host from an Android emulator. For a physical development device, use a reachable host on the same network and keep the development database private. The native client is for patients and students; staff and vendors use the responsive web workspaces.
 
-Production builds require an HTTPS API URL and the selected provider's public Dart defines in [free staging](docs/free-staging.md) or [deployment](docs/deployment.md). The Android application ID `institute.incys.incys_mobile` is registered in Firebase. `mobile/config/live.json` still targets the undeployed Firebase endpoint; create a new Supabase configuration after its actual URL exists. Configure a client-owned upload key using `mobile/android/key.properties.example`; the real key and properties file are ignored by Git. Release builds do not silently use the debug signing key.
+Build the current Android testing app with `flutter build apk --debug --dart-define-from-file=config/staging.json` from `mobile/`. This uses the live Render API and public Supabase settings; the build succeeded and its embedded endpoint was verified. Physical-device acceptance is pending. The older `mobile/config/live.json` still targets the undeployed Firebase endpoint. Configure a client-owned upload key using `mobile/android/key.properties.example`; the real key and properties file are ignored by Git. Release builds do not silently use the debug signing key.
 
 ## Validate
 
