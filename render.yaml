@@ -7,6 +7,7 @@ services:
     plan: free
     region: singapore
     dockerfilePath: ./Dockerfile
+    dockerCommand: node server.js
     healthCheckPath: /api/v1/health
     autoDeployTrigger: "off"
     envVars:
@@ -27,7 +28,7 @@ services:
       - key: DOCUMENT_SCAN_MODE
         value: deferred
       - key: APP_ORIGIN
-        sync: false
+        value: https://incys-staging.onrender.com
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_URL
