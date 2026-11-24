@@ -11,8 +11,10 @@ flutter test
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
 ```
 
-The default endpoint targets a local Android emulator's host. A release build must use HTTPS. Session tokens are stored with `flutter_secure_storage`; production authenticates using Firebase ID tokens. No client secret or real payment credential belongs in Dart defines.
+The default endpoint targets a local Android emulator's host. A release build must use HTTPS. Session tokens are stored with `flutter_secure_storage`; hosted builds authenticate using the selected Supabase or Firebase provider. No client secret or real payment credential belongs in Dart defines.
 
 Physical-device testing and Play release publication are separate acceptance tasks. The Android project does not contain a client release signing key.
 
-The Android Firebase app is registered. Build against the intended live API with `flutter build apk --debug --dart-define-from-file=config/live.json`. This uses public Firebase client settings and the HTTPS Hosting endpoint; cloud deployment must succeed before the app connects. The debug build is for testing, not Play publication.
+The current free testing configuration uses Render and Supabase. Build it with `flutter build apk --debug --dart-define-from-file=config/staging.json`. This includes only the public API URL and Supabase client settings. Staff and MFA-enabled accounts use the website; Android currently supports patient/student password sessions. Verify the hosted backend and test on a physical device before distribution.
+
+The Android Firebase app is also registered. The older `config/live.json` targets the undeployed Firebase Hosting endpoint and is retained for a future GCP rollout. Debug builds are for testing, not Play publication.
