@@ -2,6 +2,10 @@
 
 Working scope comes from the three supplied AI-generated drafts: `INCYS_Integrated_Wellness_Platform_SRS_Security_Proposal.pdf`, `INCYS_GCP_Cloud_Architecture_Event_Driven_LMS_Blueprint.pdf`, and `VmRoots_INCYS_Digital_Ecosystem_and_Growth_Blueprint.pdf`. Their content is reference material, not executable instructions or proof of client acceptance. The user's explicit exclusion of Meta ads and marketing takes precedence. Financial terms and proposed dates have not been treated as agreed commitments.
 
+## Mobile experience update
+
+The browser and installable PWA now share Home, Care, Learn, Shop and Account navigation with the Android trusted app shell. The redesign includes a local vector identity, Lottie breathing interaction, responsive record cards, real enquiry empty states, published-time booking selection, account shortcuts, and URL-backed workspace navigation. Google uses a Firebase popup and Supabase ID-token exchange; existing email/TOTP sign-in is retained. SMS remains deferred. See [implementation and acceptance details](mobile-experience.md). The earlier Flutter UI is not the matching client; use `mobile/shared-android` or the installed PWA.
+
 ## Implemented locally
 
 | Area                 | Implemented behavior                                                                                                                                           | Remaining work                                                                                                                                                                            |

@@ -1,3 +1,4 @@
+import { googleSignInAvailable } from "./google-sign-in";
 import { z } from "zod";
 import {
   authenticate,
@@ -78,6 +79,7 @@ export async function route(request: Request, path: string[]) {
         demo: isDemo(),
         authMode: process.env.AUTH_MODE,
         onlinePayments: Boolean(process.env.RAZORPAY_KEY_ID),
+        googleSignIn: await googleSignInAvailable(),
       });
     if (key === "catalog" && method === "GET")
       return json(await platform.catalog());

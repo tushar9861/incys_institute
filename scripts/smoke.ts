@@ -33,7 +33,22 @@ try {
     await new Promise((r) => setTimeout(r, 250));
   }
   assert.ok(ready, "Production server must become healthy.");
-  for (const path of ["/", "/login", "/portal/student", "/verify/invalid"]) {
+  for (const path of [
+    "/",
+    "/care",
+    "/learn",
+    "/shop",
+    "/account",
+    "/login",
+    "/portal/student",
+    "/verify/invalid",
+    "/manifest.webmanifest",
+    "/icons/icon-192.png",
+    "/animations/breathe.json",
+    "/.well-known/assetlinks.json",
+    "/offline.html",
+    "/sw.js",
+  ]) {
     const r = await fetch(base + path);
     assert.equal(r.status, 200, path);
     assert.match(r.headers.get("x-content-type-options") || "", /nosniff/);

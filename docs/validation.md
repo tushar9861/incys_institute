@@ -1,5 +1,15 @@
 # Validation record — updated 24 November 2026
 
+## Shared mobile redesign — 24 November 2026
+
+- 20 browser scenarios passed: all eight roles, five public tabs at 320/390/768/1440px, enquiry consent and focus restoration, catalogue retry/filter states, browser Back/reload, booking conflict recovery, reduced motion, PWA assets, and student/trainer attachments.
+- 25 PostgreSQL/auth integration checks passed, plus the new isolated Google provider availability test (26 checks total).
+- TypeScript, formatting, production build with `NEXT_PUBLIC_AUTH_MODE=supabase`, and expanded production HTTP smoke checks passed.
+- Android trusted app shell assembled successfully with SDK 36 / JDK 21. APK signature matches the public Digital Asset Links certificate fingerprint. No physical device was attached.
+- Firebase Google provider enabled; live Render origin authorized. Google authorization initialization uses the expected web client and forwards the nonce. Supabase reports Google enabled and rejects an invalid Google ID token. These are configuration and negative checks, not a completed personal Google sign-in.
+- Live deployment acceptance for the new source is recorded in [Render deployment](render-deployment.md) after the deployment completes.
+
+
 Observed development checks, not a production acceptance certificate.
 
 | Check | Result |

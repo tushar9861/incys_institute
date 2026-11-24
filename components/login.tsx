@@ -1,11 +1,15 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Leaf, ShieldCheck } from "lucide-react";
+import { ShieldCheck, Eye, EyeOff } from "lucide-react";
+import { Brand } from "./app-navigation";
+import { WellnessArt } from "./wellness-art";
 import { supabaseBrowser } from "@/lib/supabase-client";
 import {
   api,
   signIn,
+  signInGoogle,
+  signInDestination,
   signUp,
   preferredRole,
   hostedAuthEnabled,
@@ -23,7 +27,9 @@ export function Login() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
-    [demo, setDemo] = useState(false);
+    [demo, setDemo] = useState(false),
+    [googleEnabled, setGoogleEnabled] = useState(false),
+    [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
     [challenge, setChallenge] = useState<AuthenticatorChallenge | null>(null),
@@ -33,7 +39,10 @@ export function Login() {
     [code, setCode] = useState("");
   useEffect(() => {
     api("config")
-      .then((c) => setDemo(c.demo))
+      .then((c) => {
+        setDemo(c.demo);
+        setGoogleEnabled(c.googleSignIn);
+      })
       .catch(() => {});
     if (supabaseEnabled) {
       const { data } = supabaseBrowser().auth.onAuthStateChange((event) => {
@@ -46,6 +55,7 @@ export function Login() {
     e.preventDefault();
     setBusy(true);
     setError("");
+    setNotice("");
     const f = new FormData(e.currentTarget);
     try {
       if (recovery) {
@@ -70,10 +80,16 @@ export function Login() {
         : signup
           ? await signUp(String(f.get("name")), email, password)
           : await signIn(email, password);
-      window.location.href = `/portal/${preferredRole(r.user.roles)}`;
+      window.location.href = signInDestination(r.user.roles);
     } catch (e) {
-      if (e instanceof AuthenticatorChallenge) setChallenge(e);
-      setError((e as Error).message);
+      if (e instanceof AuthenticatorChallenge) {
+        setChallenge(e);
+        setError("");
+      } else if ((e as Error).message.startsWith("Verification email sent")) {
+        setNotice((e as Error).message);
+        setSignup(false);
+        setPassword("");
+      } else setError((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -95,33 +111,23 @@ export function Login() {
   return (
     <main className="login-layout">
       <section className="login-story">
-        <Link href="/" className="brand light">
-          <Leaf />
-          INCYS<span>Institute of Nature Cure & Yogic Science</span>
-        </Link>
+        <Brand />
         <div>
-          <p className="eyebrow">Your connected wellness space</p>
+          <p className="micro-label">WELCOME TO YOUR WELLBEING</p>
           <h1>
             A little more balance.
-            <br />A world of possibilities.
+            <br />A space that’s yours.
           </h1>
-          <p>
-            Care for your wellbeing. Deepen your learning. Stay connected with
-            your institute.
-          </p>
-          <div className="login-promise">
-            <ShieldCheck size={24} />
-            <span>
-              Your records are shared only with the people authorized to help
-              you.
-            </span>
-          </div>
+          <p>Your care and learning, connected.</p>
         </div>
-        <small>Balasore, Odisha</small>
+        <WellnessArt />
+        <small className="login-promise">
+          <ShieldCheck size={19} /> Your records. Your private space.
+        </small>
       </section>
       <section className="login-form">
         <Link className="text-link" href="/">
-          Back to institute
+          Back to home
         </Link>
         <h2>
           {recovery
@@ -140,9 +146,52 @@ export function Login() {
             : challenge
               ? "Enter the code from your registered authenticator app."
               : signup
-                ? "Start your learning and wellness journey."
-                : "Sign in to continue to your workspace."}
+                ? "Use at least 12 characters for your password."
+                : "Your care, courses and everyday essentials."}
         </p>
+        {!secret && !challenge && !recovery && googleEnabled && (
+          <>
+            <button
+              className="button google-button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError("");
+                setNotice("");
+                try {
+                  const r = await signInGoogle();
+                  window.location.href = signInDestination(r.user.roles);
+                } catch (e) {
+                  if (e instanceof AuthenticatorChallenge) setChallenge(e);
+                  else setError((e as Error).message);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="#4285F4"
+                  d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.01v2.51h3.24c1.9-1.75 2.98-4.33 2.98-7.35Z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 22c2.7 0 4.96-.9 6.62-2.42l-3.24-2.51c-.9.6-2.05.97-3.38.97-2.6 0-4.81-1.76-5.6-4.12H3.05v2.59A10 10 0 0 0 12 22Z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M6.4 13.92a6 6 0 0 1 0-3.84V7.49H3.05a10 10 0 0 0 0 9.02l3.35-2.59Z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.96c1.47 0 2.79.5 3.82 1.5l2.87-2.87A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.95 5.49l3.35 2.59A5.99 5.99 0 0 1 12 5.96Z"
+                />
+              </svg>
+              Continue with Google
+            </button>
+            <div className="auth-divider">or use your email</div>
+          </>
+        )}
         <form onSubmit={submit}>
           {secret && (
             <>
@@ -209,14 +258,27 @@ export function Login() {
               </label>
               <label>
                 Password
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete={signup ? "new-password" : "current-password"}
-                  required
-                  minLength={signup ? 12 : 1}
-                />
+                <span className="password-field">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete={signup ? "new-password" : "current-password"}
+                    required
+                    minLength={signup ? 12 : 1}
+                    maxLength={128}
+                  />
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                  </button>
+                </span>
               </label>
               {signup && (
                 <label className="check">
@@ -267,6 +329,7 @@ export function Login() {
               onClick={() => {
                 setSignup(!signup);
                 setError("");
+                setNotice("");
               }}
             >
               {signup
@@ -276,7 +339,15 @@ export function Login() {
             {hostedAuthEnabled && !signup && (
               <button
                 className="text-link"
+                disabled={busy}
                 onClick={async () => {
+                  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    setError("Enter your email address first.");
+                    return;
+                  }
+                  setBusy(true);
+                  setError("");
+                  setNotice("");
                   try {
                     await resetPassword(email);
                     setNotice(
@@ -284,6 +355,8 @@ export function Login() {
                     );
                   } catch (e) {
                     setError((e as Error).message);
+                  } finally {
+                    setBusy(false);
                   }
                 }}
               >

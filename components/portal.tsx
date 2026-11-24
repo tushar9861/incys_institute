@@ -1,6 +1,10 @@
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { BottomNav, type Destination } from "./app-navigation";
+import { BookingSheet } from "./booking-sheet";
+import { WellnessArt } from "./wellness-art";
 import {
   Leaf,
   LayoutDashboard,
@@ -23,6 +27,9 @@ import {
   FileCheck,
   Package,
   ChevronDown,
+  ChevronRight,
+  UserRound,
+  Smartphone,
 } from "lucide-react";
 import { api, money, date, logout, preferredRole } from "@/lib/client";
 import { QuizComposer } from "./quiz-composer";
@@ -44,6 +51,7 @@ type Modal = {
   label?: string;
 };
 const icons: Record<string, any> = {
+  account: UserRound,
   overview: LayoutDashboard,
   appointments: CalendarDays,
   plans: HeartPulse,
@@ -83,6 +91,7 @@ const menus: Record<string, string[]> = {
   finance: ["overview", "finance", "admissions", "support"],
   patient: [
     "overview",
+    "learning",
     "appointments",
     "plans",
     "shop",
@@ -112,6 +121,7 @@ const menus: Record<string, string[]> = {
   ],
 };
 const names: Record<string, string> = {
+  account: "Account",
   overview: "Overview",
   appointments: "Appointments",
   plans: "Care plans",
@@ -173,7 +183,9 @@ function DataTable({
           {rs.map((r, i) => (
             <tr key={i}>
               {r.map((cell, j) => (
-                <td key={j}>{cell}</td>
+                <td key={j} data-label={head[j]}>
+                  {cell}
+                </td>
               ))}
             </tr>
           ))}
@@ -199,6 +211,19 @@ function FormModal({
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = dialog.current!;
+    const trigger = document.activeElement as HTMLElement | null;
+    d.showModal();
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      d.close();
+      document.body.style.overflow = previous;
+      trigger?.focus();
+    };
+  }, []);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget),
@@ -229,18 +254,19 @@ function FormModal({
     }
   }
   return (
-    <div
-      className="modal-backdrop"
+    <dialog
+      ref={dialog}
+      className="modal-backdrop native-dialog"
+      aria-labelledby="modal-title"
+      onCancel={(e) => {
+        if (busy) e.preventDefault();
+        else close();
+      }}
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) close();
       }}
     >
-      <section
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="modal-title"
-      >
+      <section className="modal">
         <div className="modal-heading">
           <h2 id="modal-title">{modal.title}</h2>
           <button
@@ -344,17 +370,48 @@ function FormModal({
           </div>
         </form>
       </section>
-    </div>
+    </dialog>
   );
 }
 export function Portal({ role }: { role: string }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const consumer = ["patient", "student"].includes(role);
+  const allowedTabs = [
+    ...(menus[role] || []),
+    ...(["admin", "trainer"].includes(role) ? ["learning"] : []),
+    "account",
+  ];
+  const tab = allowedTabs.includes(searchParams.get("tab") || "")
+    ? searchParams.get("tab")!
+    : "overview";
+  function setTab(next: string) {
+    if (!allowedTabs.includes(next)) {
+      router.push(
+        next === "learning"
+          ? "/learn"
+          : next === "shop"
+            ? "/shop"
+            : next === "appointments"
+              ? "/care"
+              : `/portal/${role}?tab=account`,
+      );
+      return;
+    }
+    setSearch("");
+    setDetail(null);
+    setSidebar(false);
+    router.push(`/portal/${role}${next === "overview" ? "" : `?tab=${next}`}`, {
+      scroll: true,
+    });
+  }
   const [data, setData] = useState<any>(null),
     [catalog, setCatalog] = useState<any>(null),
-    [tab, setTab] = useState("overview"),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
+    [booking, setBooking] = useState(false),
     [modal, setModal] = useState<Modal | null>(null),
     [demo, setDemo] = useState(false),
     [sidebar, setSidebar] = useState(false),
@@ -390,7 +447,50 @@ export function Portal({ role }: { role: string }) {
   }
   useEffect(() => {
     refresh();
+    const onFocus = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onFocus);
+    return () => document.removeEventListener("visibilitychange", onFocus);
   }, [role]);
+  useEffect(() => {
+    setSearch("");
+    if (tab !== "learning") setDetail(null);
+  }, [tab]);
+  useEffect(() => {
+    if (!sidebar) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const panel = document.querySelector<HTMLElement>(".sidebar");
+    const focusable = () =>
+      Array.from(
+        panel?.querySelectorAll<HTMLElement>(
+          "button:not([disabled]),a[href],select",
+        ) || [],
+      ).filter((el) => el.getClientRects().length);
+    focusable()[0]?.focus();
+    const handle = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSidebar(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      const first = items[0],
+        last = items.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", handle);
+    return () => {
+      document.removeEventListener("keydown", handle);
+      previous?.focus();
+    };
+  }, [sidebar]);
   const act = async (fn: () => Promise<any>, message = "Changes saved.") => {
     if (busy) return;
     setBusy(true);
@@ -424,7 +524,11 @@ export function Portal({ role }: { role: string }) {
         JSON.stringify(r).toLowerCase().includes(search.toLowerCase()),
     );
   const button = (label: string, fn: () => void, kind = "secondary") => (
-    <button className={`button tiny ${kind}`} onClick={fn} disabled={busy}>
+    <button
+      className={`button tiny ${kind}`}
+      onClick={fn}
+      disabled={busy || label === "Already applied"}
+    >
       {label}
     </button>
   );
@@ -468,31 +572,27 @@ export function Portal({ role }: { role: string }) {
   }
   async function learn(id: string) {
     await act(async () => {
-      setDetail(await api(`enrolments/${id}`));
-      setTab("learning");
+      const course = await api(`enrolments/${id}`);
+      router.push(`/portal/${role}?tab=learning`, { scroll: true });
+      setDetail(course);
     }, "Course loaded.");
   }
-  function book() {
-    open("Book an appointment", "appointments", [
-      select("serviceId", "Service", opts(catalog.services)),
-      select("practitionerId", "Practitioner", opts(catalog.practitioners)),
+  function askAboutCare() {
+    open("Ask about appointments", "tickets", [
+      { name: "subject", label: "Subject", value: "Appointment availability" },
       {
-        name: "startsAt",
-        label: "Start time (your device time zone)",
-        type: "datetime-local",
-      },
-      select("mode", "Appointment type", [
-        { value: "in_person", label: "At the institute" },
-        { value: "online", label: "Online consultation" },
-      ]),
-      {
-        name: "consent",
-        label:
-          "I agree to this booking and, if online, a remote consultation with the assigned practitioner.",
-        type: "checkbox",
-        required: true,
+        name: "message",
+        label: "How can the care team help?",
+        type: "textarea",
       },
     ]);
+  }
+  function book() {
+    if (!catalog.services.length || !catalog.practitioners.length) {
+      askAboutCare();
+      return;
+    }
+    setBooking(true);
   }
   function newClass() {
     open("Schedule a class", "classes", [
@@ -657,8 +757,20 @@ export function Portal({ role }: { role: string }) {
     );
   const cohorts = data.cohorts || [];
   return (
-    <div className="app-shell">
-      <aside className={`sidebar ${sidebar ? "open" : ""}`}>
+    <div
+      className={`app-shell ${consumer ? "consumer-workspace" : "staff-workspace"}`}
+    >
+      <aside
+        className={`sidebar ${sidebar ? "open" : ""}`}
+        aria-label="Workspace navigation"
+      >
+        <button
+          className="icon-button sidebar-close"
+          aria-label="Close sidebar"
+          onClick={() => setSidebar(false)}
+        >
+          <X size={20} />
+        </button>
         <Link href="/" className="brand">
           <span className="brand-mark">
             <Leaf />
@@ -667,11 +779,12 @@ export function Portal({ role }: { role: string }) {
         </Link>
         <div className="workspace-label">{roleNames[role]}</div>
         <nav>
-          {(menus[role] || menus.patient).map((t) => {
+          {[...(menus[role] || menus.patient), "account"].map((t) => {
             const Icon = icons[t];
             return (
               <button
                 className={tab === t ? "active" : ""}
+                aria-current={tab === t ? "page" : undefined}
                 key={t}
                 onClick={() => {
                   setTab(t);
@@ -742,7 +855,7 @@ export function Portal({ role }: { role: string }) {
           </div>
           <div className="header-actions">
             <span className="timezone">Times shown in IST</span>
-            <Link href="/">Visit website</Link>
+            <Link href="/">Explore INCYS</Link>
             <span className="avatar small-avatar">
               {data.user.name.slice(0, 1)}
             </span>
@@ -754,7 +867,7 @@ export function Portal({ role }: { role: string }) {
           </div>
         )}
         <main className="workspace-content">
-          <div className="page-heading">
+          <div className="page-heading" key={tab}>
             <div>
               <p className="eyebrow">
                 {tab === "overview"
@@ -816,7 +929,7 @@ export function Portal({ role }: { role: string }) {
               </button>
             </div>
           )}
-          {tab !== "overview" && !detail && (
+          {tab !== "overview" && tab !== "account" && !detail && (
             <div className="search-box">
               <Search size={17} />
               <input
@@ -827,8 +940,152 @@ export function Portal({ role }: { role: string }) {
               />
             </div>
           )}
+          {tab === "account" && (
+            <section className="workspace-account">
+              <div className="profile-card">
+                <span className="avatar">{data.user.name.slice(0, 1)}</span>
+                <div>
+                  <h2>{data.user.name}</h2>
+                  <p>{data.user.email}</p>
+                  <small>{roleNames[role]}</small>
+                </div>
+              </div>
+              <div className="account-link-grid">
+                {[
+                  {
+                    tab: "appointments",
+                    label: "My appointments",
+                    detail: "Bookings & visits",
+                    icon: CalendarDays,
+                    tint: "mint",
+                  },
+                  {
+                    tab: "learning",
+                    label: "My learning",
+                    detail: "Courses & progress",
+                    icon: BookOpen,
+                    tint: "lilac",
+                  },
+                  {
+                    tab: "plans",
+                    label: "Care plans",
+                    detail: "Your practitioner’s guidance",
+                    icon: HeartPulse,
+                    tint: "mint",
+                  },
+                  {
+                    tab: "orders",
+                    label: "Orders",
+                    detail: "Track your purchases",
+                    icon: Package,
+                    tint: "peach",
+                  },
+                  {
+                    tab: "finance",
+                    label: "Payments",
+                    detail: "Receipts & statements",
+                    icon: Wallet,
+                    tint: "blue",
+                  },
+                  {
+                    tab: "notifications",
+                    label: "Notifications",
+                    detail: "Your latest updates",
+                    icon: Bell,
+                    tint: "lilac",
+                  },
+                  {
+                    tab: "support",
+                    label: "Documents & support",
+                    detail: "Files, help & privacy",
+                    icon: MessageSquare,
+                    tint: "mint",
+                  },
+                ]
+                  .filter((item) => allowedTabs.includes(item.tab))
+                  .map((item) => (
+                    <button
+                      className="context-row"
+                      key={item.tab}
+                      onClick={() => setTab(item.tab)}
+                    >
+                      <span className={`icon-tile ${item.tint}`}>
+                        <item.icon size={21} />
+                      </span>
+                      <span>
+                        <strong>{item.label}</strong>
+                        <small>{item.detail}</small>
+                      </span>
+                      <ChevronRight size={18} />
+                    </button>
+                  ))}
+              </div>
+              {data.user.roles.length > 1 && (
+                <label className="workspace-switch">
+                  Switch workspace
+                  <select
+                    value={role}
+                    onChange={(e) =>
+                      router.push(`/portal/${e.target.value}?tab=account`)
+                    }
+                  >
+                    {data.user.roles.map((r: string) => (
+                      <option key={r} value={r}>
+                        {roleNames[r] || r}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <details className="install-guide">
+                <summary>
+                  <Smartphone size={21} />
+                  <span>Install INCYS on your phone</span>
+                  <ChevronRight size={18} />
+                </summary>
+                <p>
+                  iPhone: open in Safari → Share → Add to Home Screen. Android:
+                  open the browser menu → Install app. Your account works across
+                  devices.
+                </p>
+              </details>
+              <button
+                className="button secondary account-signout"
+                disabled={busy}
+                onClick={() =>
+                  act(async () => {
+                    await logout();
+                    window.location.href = "/login";
+                  })
+                }
+              >
+                <LogOut size={18} />
+                Sign out
+              </button>
+            </section>
+          )}
           {tab === "overview" && (
             <>
+              {consumer && (
+                <div className="workspace-hero">
+                  <section className="wellness-hero">
+                    <div className="wellness-copy">
+                      <span className="soft-pill">
+                        <span /> YOUR SPACE TO FEEL BETTER
+                      </span>
+                      <h2>
+                        A little care.
+                        <br />A fresh start.
+                      </h2>
+                      <p>Your next step is right here.</p>
+                      <button className="button" onClick={book}>
+                        Book care
+                      </button>
+                    </div>
+                    <WellnessArt />
+                  </section>
+                </div>
+              )}
               <div className="metric-grid">
                 {[
                   {
@@ -916,6 +1173,7 @@ export function Portal({ role }: { role: string }) {
                 ].map((m) => (
                   <button
                     className="metric"
+                    disabled={!allowedTabs.includes(m.target)}
                     key={m.label}
                     onClick={() => {
                       if (menus[role].includes(m.target)) setTab(m.target);
@@ -1036,6 +1294,11 @@ export function Portal({ role }: { role: string }) {
                   <h2>Institute notices</h2>
                   <span className="muted">Updates from the team</span>
                 </div>
+                {!(data.notices || catalog.announcements).length && (
+                  <p className="quiet-empty">
+                    You’re all caught up. Institute updates will appear here.
+                  </p>
+                )}
                 {(data.notices || catalog.announcements).map((a: any) => (
                   <article className="notice-item" key={a.id}>
                     <span className="round-icon">
@@ -1208,7 +1471,37 @@ export function Portal({ role }: { role: string }) {
                   </article>
                 ))}
               </div>
-              <h2 className="spaced-heading">Explore upcoming intakes</h2>
+              {!data.enrolments.length && !catalog.cohorts.length && (
+                <section className="app-empty lilac">
+                  <BookOpen size={44} strokeWidth={1.3} />
+                  <h2>Your next chapter awaits.</h2>
+                  <p>
+                    Ask the academic team about upcoming courses and intakes.
+                  </p>
+                  <button
+                    className="button"
+                    onClick={() =>
+                      open("Course enquiry", "tickets", [
+                        {
+                          name: "subject",
+                          label: "Subject",
+                          value: "Courses & upcoming intakes",
+                        },
+                        {
+                          name: "message",
+                          label: "What would you like to study?",
+                          type: "textarea",
+                        },
+                      ])
+                    }
+                  >
+                    Ask about courses
+                  </button>
+                </section>
+              )}
+              {catalog.cohorts.length > 0 && (
+                <h2 className="spaced-heading">Explore upcoming intakes</h2>
+              )}
               <div className="cards two">
                 {catalog.cohorts.map((c: any) => (
                   <article className="panel" key={c.id}>
@@ -1227,7 +1520,23 @@ export function Portal({ role }: { role: string }) {
                         ? "Already applied"
                         : "Apply for admission",
                       () =>
-                        mutate("enrolments", { cohortId: c.id, consent: true }),
+                        setModal({
+                          title: "Apply for admission",
+                          fields: [
+                            {
+                              name: "consent",
+                              label: `I agree to apply for ${c.name} and share my account details with the academic team.`,
+                              type: "checkbox",
+                              required: true,
+                            },
+                          ],
+                          label: "Submit application",
+                          submit: (v) =>
+                            api("enrolments", "POST", {
+                              cohortId: c.id,
+                              consent: v.consent,
+                            }),
+                        }),
                       "",
                     )}
                   </article>
@@ -1711,6 +2020,47 @@ export function Portal({ role }: { role: string }) {
           )}
           {tab === "shop" && (
             <>
+              {!catalog.products.length && (
+                <section className="app-empty peach">
+                  <ShoppingBag size={44} strokeWidth={1.3} />
+                  <h2>Good things are on their way.</h2>
+                  <p>
+                    Products will appear here when the institute publishes them.
+                  </p>
+                  <button
+                    className="button"
+                    onClick={() =>
+                      open("Product enquiry", "tickets", [
+                        {
+                          name: "subject",
+                          label: "Subject",
+                          value: "Wellness products",
+                        },
+                        {
+                          name: "message",
+                          label: "What are you looking for?",
+                          type: "textarea",
+                        },
+                      ])
+                    }
+                  >
+                    Ask about products
+                  </button>
+                </section>
+              )}
+              {catalog.products.length > 0 &&
+                !filter(catalog.products).length && (
+                  <div className="app-empty">
+                    <Search size={30} />
+                    <h2>No matching products.</h2>
+                    <button
+                      className="button secondary"
+                      onClick={() => setSearch("")}
+                    >
+                      Clear search
+                    </button>
+                  </div>
+                )}
               <div className="shop-layout">
                 <div className="cards two">
                   {filter(catalog.products).map((p: any) => (
@@ -2483,6 +2833,46 @@ export function Portal({ role }: { role: string }) {
           )}
         </main>
       </div>
+      <BottomNav
+        active={
+          (tab === "overview"
+            ? "home"
+            : ["appointments", "plans"].includes(tab)
+              ? "care"
+              : ["learning", "teaching", "admissions"].includes(tab)
+                ? "learn"
+                : ["shop", "inventory"].includes(tab)
+                  ? "shop"
+                  : "account") as Destination
+        }
+        links={{
+          home: `/portal/${role}`,
+          care: allowedTabs.includes("appointments")
+            ? `/portal/${role}?tab=appointments`
+            : "/care",
+          learn: allowedTabs.includes("learning")
+            ? `/portal/${role}?tab=learning`
+            : allowedTabs.includes("teaching")
+              ? `/portal/${role}?tab=teaching`
+              : "/learn",
+          shop: allowedTabs.includes("shop")
+            ? `/portal/${role}?tab=shop`
+            : "/shop",
+          account: `/portal/${role}?tab=account`,
+        }}
+      />
+      {booking && (
+        <BookingSheet
+          catalog={catalog}
+          close={() => setBooking(false)}
+          done={() => {
+            setNotice("Appointment confirmed. Your booking is in Care.");
+            refresh();
+            setTab("appointments");
+          }}
+          requestHelp={askAboutCare}
+        />
+      )}
       {quizComposer && (
         <QuizComposer
           cohorts={cohorts}

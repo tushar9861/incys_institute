@@ -1,6 +1,6 @@
 # INCYS institute platform
 
-An implemented development release for the Institute of Nature Cure & Yogic Science, Balasore. It includes a public website, role-based web workspaces, a shared PostgreSQL API, a Flutter Android client, and GCP infrastructure definitions. Advertising and marketing automation are excluded.
+An implemented development release for the Institute of Nature Cure & Yogic Science, Balasore. It includes an installable mobile-first web app, role-based workspaces, a shared PostgreSQL API, a matching Android app shell, the earlier Flutter prototype, and GCP infrastructure definitions. Advertising and marketing automation are excluded.
 
 **Testing site:** [incys-staging.onrender.com](https://incys-staging.onrender.com) is live on **Render Free + Supabase Free**. Live checks passed for database access, password sign-in, session revocation, private uploads and quarantine enforcement; demo authentication and simulated payments are disabled. See [deployment details](docs/render-deployment.md) and [free staging](docs/free-staging.md). The first institute administrator, approved catalogue content, email delivery, staff MFA, payments and remaining [launch acceptance](docs/delivery-status.md) still need completion. GCP remains paused because its billing account is closed. No real payments have been collected.
 
@@ -52,7 +52,18 @@ The registered `incys-institute` Firebase web app is configured in `config/fireb
 
 The project is on **Blaze**, as authorized by the user. Follow [the deployment guide](docs/firebase-deployment.md). `npm run cloud:preflight` verifies account access and the linked billing-account status; `npm run cloud:deploy` provisions the services, migrates the database and publishes Hosting after readiness checks. The Firebase web API key identifies the app; deployment uses the authorized Google Cloud account.
 
-## Android
+## Shared mobile interface
+
+Home, Care, Learn, Shop and Account use the same interface on the web, installed iPhone/Android PWA, and the [shared Android app](mobile/shared-android/README.md). This is the current app for matching web/mobile testing; the Flutter client below is retained as the earlier prototype. See [mobile experience and Google authentication](docs/mobile-experience.md) for design, installation, security and acceptance details.
+
+```bash
+cd mobile/shared-android
+./gradlew assembleDebug
+```
+
+Use JDK 21 and Android SDK 36. The testing APK is not a signed store release. Google sign-in uses Firebase's popup and the existing Supabase account/session; SMS is deferred.
+
+## Earlier Flutter client
 
 Use Flutter **3.50.1** with a full Java 21 JDK and Android SDK platforms 34, 35 and 36. Flutter installs its matching NDK when required.
 
@@ -66,7 +77,7 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
 
 `10.0.2.2` reaches the host from an Android emulator. For a physical development device, use a reachable host on the same network and keep the development database private. The native client is for patients and students; staff and vendors use the responsive web workspaces.
 
-Build the current Android testing app with `flutter build apk --debug --dart-define-from-file=config/staging.json` from `mobile/`. This uses the live Render API and public Supabase settings; the build succeeded and its embedded endpoint was verified. Physical-device acceptance is pending. The older `mobile/config/live.json` still targets the undeployed Firebase endpoint. Configure a client-owned upload key using `mobile/android/key.properties.example`; the real key and properties file are ignored by Git. Release builds do not silently use the debug signing key.
+Build the earlier Flutter testing app with `flutter build apk --debug --dart-define-from-file=config/staging.json` from `mobile/`. This uses the live Render API and public Supabase settings; the build succeeded and its embedded endpoint was verified. Physical-device acceptance is pending. The older `mobile/config/live.json` still targets the undeployed Firebase endpoint. Configure a client-owned upload key using `mobile/android/key.properties.example`; the real key and properties file are ignored by Git. Release builds do not silently use the debug signing key.
 
 ## Validate
 

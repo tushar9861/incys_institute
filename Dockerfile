@@ -30,6 +30,7 @@ ENV DEPLOYMENT_VERSION=$DEPLOYMENT_VERSION
 RUN addgroup -S incys && adduser -S incys -G incys
 COPY --from=build --chown=incys:incys /app/.next/standalone ./
 COPY --from=build --chown=incys:incys /app/.next/static ./.next/static
+COPY --from=build --chown=incys:incys /app/public ./public
 COPY --from=build --chown=incys:incys /app/scripts ./scripts
 COPY --from=build --chown=incys:incys /app/server ./server
 COPY --from=build --chown=incys:incys /app/config ./config

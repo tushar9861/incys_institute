@@ -46,4 +46,5 @@ await run([
   "tests/platform.test.ts",
   "tests/deployment.test.ts",
   "tests/supabase.test.ts",
+  "tests/google-sign-in.test.ts",
 ]);

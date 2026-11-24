@@ -7,6 +7,10 @@ export { firebaseEnabled } from "./firebase-config";
 export { hostedAuthEnabled, supabaseEnabled } from "./auth-config";
 import {
   getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  inMemoryPersistence,
+  setPersistence,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
@@ -34,8 +38,17 @@ export async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 function auth() {
-  if (!getApps().length) initializeApp(firebaseConfig);
+  if (!getApps().some((app) => app.name === "[DEFAULT]"))
+    initializeApp(firebaseConfig);
   return getAuth();
+}
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
 }
 export async function api<T = any>(
   path: string,
@@ -47,18 +60,102 @@ export async function api<T = any>(
   Object.assign(headers, await authHeaders());
   const response = await fetch(`/api/v1/${path}`, {
     method,
+    signal: AbortSignal.timeout(90000),
     headers,
     credentials: "same-origin",
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const data = await response.json();
+  const data = await response.json().catch(() => ({
+    error: "The service is temporarily unavailable. Please try again.",
+  }));
   if (!response.ok)
-    throw new Error(
+    throw new ApiError(
       data.fields?.length
         ? `${data.error} ${data.fields.map((f: any) => `${f.path}: ${f.message}`).join(" ")}`
         : data.error || "Request failed.",
+      response.status,
     );
   return data;
+}
+// Firebase handles Google's popup; Supabase remains the single application session.
+// Neither Firebase access tokens nor an email address grant access to app records.
+export async function signInGoogle() {
+  if (!supabaseEnabled && !firebaseEnabled)
+    throw new Error("Google sign-in is available on the hosted app.");
+  const provider = new GoogleAuthProvider();
+  const nonce = Array.from(crypto.getRandomValues(new Uint8Array(32)), (n) =>
+    n.toString(16).padStart(2, "0"),
+  ).join("");
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(nonce),
+  );
+  const hashedNonce = Array.from(new Uint8Array(hash), (n) =>
+    n.toString(16).padStart(2, "0"),
+  ).join("");
+  provider.setCustomParameters({
+    prompt: "select_account",
+    nonce: hashedNonce,
+  });
+  // The transient Firebase session is separate from any legacy Firebase app session.
+  const googleAuth = supabaseEnabled
+    ? getAuth(
+        getApps().find((app) => app.name === "incys-google") ||
+          initializeApp(firebaseConfig, "incys-google"),
+      )
+    : auth();
+  if (supabaseEnabled) await setPersistence(googleAuth, inMemoryPersistence);
+  try {
+    const result = await signInWithPopup(googleAuth, provider);
+    if (supabaseEnabled) {
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential?.idToken)
+        throw new Error(
+          "Google didn’t return a sign-in credential. Please try again.",
+        );
+      const { error } = await supabaseBrowser().auth.signInWithIdToken({
+        provider: "google",
+        token: credential.idToken,
+        nonce,
+      });
+      if (error) throw error;
+      const { data, error: factorsError } =
+        await supabaseBrowser().auth.mfa.listFactors();
+      if (factorsError) throw factorsError;
+      if (data.totp.length)
+        throw new AuthenticatorChallenge(undefined, data.totp[0].id);
+    }
+    return { user: await api("me") };
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (
+      code === "auth/popup-closed-by-user" ||
+      code === "auth/cancelled-popup-request"
+    )
+      throw new Error(
+        "Sign-in was closed. You can try again when you’re ready.",
+      );
+    if (code === "auth/popup-blocked")
+      throw new Error(
+        "Allow the Google sign-in window in your browser, then try again.",
+      );
+    if (code === "auth/multi-factor-auth-required") {
+      if (supabaseEnabled)
+        throw new Error(
+          "This Google identity has an additional Firebase verification requirement. Use your existing email sign-in or contact the institute for help.",
+        );
+      throw new AuthenticatorChallenge(
+        getMultiFactorResolver(googleAuth, error as MultiFactorError),
+      );
+    }
+    throw error;
+  } finally {
+    if (supabaseEnabled) await signOut(googleAuth).catch(() => {});
+  }
+}
+export function signInDestination(roles: string[]) {
+  const intent = new URLSearchParams(window.location.search).get("intent");
+  return `/portal/${preferredRole(roles)}${intent && ["appointments", "learning", "shop", "orders", "support", "account"].includes(intent) ? `?tab=${intent}` : ""}`;
 }
 export async function signIn(email: string, password: string) {
   if (supabaseEnabled) {

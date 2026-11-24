@@ -25,3 +25,7 @@ __pycache__/
 
 playwright-report/
 test-results/
+
+# Shared Android shell local build metadata
+mobile/shared-android/.gradle/
+mobile/shared-android/local.properties

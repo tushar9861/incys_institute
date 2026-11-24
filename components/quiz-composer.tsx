@@ -1,5 +1,5 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { X, Plus } from "lucide-react";
 import { api } from "@/lib/client";
 export function QuizComposer({
@@ -16,6 +16,19 @@ export function QuizComposer({
     ]),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = dialog.current!;
+    const trigger = document.activeElement as HTMLElement | null;
+    d.showModal();
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      d.close();
+      document.body.style.overflow = previous;
+      trigger?.focus();
+    };
+  }, []);
   function change(index: number, value: any) {
     setQuestions(
       questions.map((q, i) => (i === index ? { ...q, ...value } : q)),
@@ -44,16 +57,24 @@ export function QuizComposer({
     }
   }
   return (
-    <div className="modal-backdrop">
-      <section
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Create assessment"
-      >
+    <dialog
+      ref={dialog}
+      className="modal-backdrop native-dialog"
+      aria-label="Create assessment"
+      onCancel={(e) => {
+        if (busy) e.preventDefault();
+        else close();
+      }}
+    >
+      <section className="modal">
         <div className="modal-heading">
           <h2>Create an assessment</h2>
-          <button className="icon-button" onClick={close} aria-label="Close">
+          <button
+            className="icon-button"
+            onClick={close}
+            disabled={busy}
+            aria-label="Close"
+          >
             <X />
           </button>
         </div>
@@ -168,13 +189,22 @@ export function QuizComposer({
             <Plus size={16} />
             Add question
           </button>
-          {error && <p className="error">{error}</p>}
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
           <p className="section-note">
             Published assessments become part of course completion requirements.
             Check every question before publishing.
           </p>
           <div className="modal-actions">
-            <button type="button" className="button secondary" onClick={close}>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={close}
+              disabled={busy}
+            >
               Cancel
             </button>
             <button className="button" disabled={busy}>
@@ -183,6 +213,6 @@ export function QuizComposer({
           </div>
         </form>
       </section>
-    </div>
+    </dialog>
   );
 }

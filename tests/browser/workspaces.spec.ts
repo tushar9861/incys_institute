@@ -14,6 +14,16 @@ async function signIn(page: Page, role: string) {
   ).toBeVisible();
 }
 
+async function openTab(page: Page, name: string) {
+  const button = page
+    .locator("aside nav")
+    .getByRole("button", { name, exact: true, includeHidden: true });
+  if (!(await button.isVisible()))
+    await page.getByRole("button", { name: "Open sidebar" }).click();
+  await button.click();
+  await expect(button).toHaveAttribute("aria-current", "page");
+}
+
 test.beforeAll(async ({ request }) => {
   expect(
     (await (await request.get("/api/v1/config")).json()).demo,
@@ -38,8 +48,12 @@ for (const role of [
     page.on("pageerror", (error) => errors.push(error.message));
     await signIn(page, role);
     const navigation = page.locator("aside nav");
-    for (const name of await navigation.getByRole("button").allTextContents()) {
-      await navigation.getByRole("button", { name, exact: true }).click();
+    if (!(await navigation.isVisible()))
+      await page.getByRole("button", { name: "Open sidebar" }).click();
+    const names = await navigation.getByRole("button").allTextContents();
+    expect(names.length).toBeGreaterThan(4);
+    for (const name of names) {
+      await openTab(page, name.trim());
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
     }
@@ -53,10 +67,7 @@ test("student navigation and support fit a phone viewport", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, "student");
   await page.getByRole("button", { name: "Open sidebar" }).click();
-  await page
-    .locator("aside nav")
-    .getByRole("button", { name: "Support", exact: true })
-    .click();
+  await openTab(page, "Support");
   await expect(
     page.getByRole("heading", { name: "Authorized documents" }),
   ).toBeVisible();
@@ -72,10 +83,7 @@ test("student can attach an uploaded file and the assigned trainer can download 
   browser,
 }) => {
   await signIn(page, "student");
-  await page
-    .locator("aside nav")
-    .getByRole("button", { name: "Support", exact: true })
-    .click();
+  await openTab(page, "Support");
   const filename = `reflection-${Date.now()}.pdf`;
   const bytes = Buffer.from(
     "%PDF-1.4\nSynthetic browser acceptance attachment",
@@ -94,10 +102,7 @@ test("student can attach an uploaded file and the assigned trainer can download 
   await expect(
     page.getByRole("button", { name: `Download ${filename}`, exact: true }),
   ).toBeVisible();
-  await page
-    .locator("aside nav")
-    .getByRole("button", { name: "My learning", exact: true })
-    .click();
+  await openTab(page, "My learning");
   await page
     .getByRole("button", { name: "Open course", exact: true })
     .first()

@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 const config: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  devIndicators: false,
   deploymentId: process.env.DEPLOYMENT_VERSION,
   async headers() {
     return [
